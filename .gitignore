@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Environment secrets — NEVER commit this
+.env
+
+# Ephemeral session data
+data/session.json
+
+# Timestamped uploads (user-uploaded CSVs)
+data/[0-9]*-*.csv
+
+# Vercel build output
+.vercel/
+
+# macOS
+.DS_Store

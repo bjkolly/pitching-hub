@@ -1,0 +1,15 @@
+Pitcher,Date,Inning,PitchType,RelSpeed,SpinRate,HorzBreak,InducedVertBreak,RelHeight,RelSide,PitchCall,KorBB,PlayResult
+J. Rodriguez,2025-04-01,1,Fastball,95.2,2380,8.2,14.5,6.1,-2.3,StrikeCalled,,
+J. Rodriguez,2025-04-01,1,Fastball,94.8,2350,8.5,14.2,6.0,-2.1,StrikeSwinging,,
+J. Rodriguez,2025-04-01,1,Curveball,79.1,2620,−6.1,−8.3,6.2,-2.0,BallCalled,,
+J. Rodriguez,2025-04-01,1,Slider,88.3,2490,3.4,4.1,6.1,-2.2,StrikeSwinging,,
+J. Rodriguez,2025-04-01,1,Fastball,95.5,2410,8.0,14.8,6.1,-2.3,InPlay,,Groundout
+J. Rodriguez,2025-04-01,2,Fastball,95.0,2390,8.3,14.3,6.1,-2.2,StrikeCalled,,
+J. Rodriguez,2025-04-01,2,Changeup,86.2,1820,9.1,6.2,6.0,-2.1,StrikeSwinging,,
+J. Rodriguez,2025-04-01,2,Fastball,94.7,2360,8.1,14.6,6.1,-2.3,StrikeSwinging,,Strikeout
+M. Thompson,2025-04-01,1,Fastball,91.4,2180,7.2,12.1,5.8,-1.8,StrikeCalled,,
+M. Thompson,2025-04-01,1,Curveball,77.3,2580,−5.8,−9.1,5.9,-1.9,BallCalled,,
+M. Thompson,2025-04-01,1,Fastball,91.8,2200,7.4,12.3,5.8,-1.7,InPlay,,Flyout
+M. Thompson,2025-04-01,2,Slider,83.1,2310,4.2,3.8,5.8,-1.8,StrikeSwinging,,
+M. Thompson,2025-04-01,2,Fastball,91.2,2170,7.1,12.0,5.8,-1.8,BallCalled,,
+M. Thompson,2025-04-01,2,Changeup,82.5,1760,8.5,5.8,5.7,-1.6,StrikeSwinging,,Strikeout
