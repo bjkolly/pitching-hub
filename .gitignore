@@ -10,8 +10,18 @@ data/session.json
 # Timestamped uploads (user-uploaded CSVs)
 data/[0-9]*-*.csv
 
+# Python bytecode
+__pycache__/
+
+# Agent logs
+agents/*.log*
+
+# Scraped / cached data
+data/cache/
+
 # Vercel build output
 .vercel/
 
 # macOS
 .DS_Store
+.vercel

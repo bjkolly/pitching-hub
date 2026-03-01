@@ -6,6 +6,7 @@ import { parse } from 'csv-parse';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { spawn } from 'child_process';
 import cookieParser from 'cookie-parser';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
@@ -23,8 +24,10 @@ const IS_VERCEL  = !!process.env.VERCEL;
 const DATA_DIR   = IS_VERCEL
   ? '/tmp/pitching-hub'
   : path.join(__dirname, '../data');
-const SESSION    = path.join(DATA_DIR, 'session.json');
-const CLIENT_DIR = path.join(__dirname, '../client');
+const SESSION      = path.join(DATA_DIR, 'session.json');
+const CREW_SESSION = path.join(DATA_DIR, 'crew_session.json');
+const AGENTS_DIR   = path.join(__dirname, '../agents');
+const CLIENT_DIR   = path.join(__dirname, '../client');
 
 // Ensure data directory exists (critical for Vercel /tmp path)
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -141,11 +144,19 @@ function generateMockPitchers() {
   return pitchers;
 }
 
-// ── Helper: read session.json safely ─────────────────────────────────────────
+// ── Helper: read session.json safely (falls back to crew_session.json) ───────
 function readSession() {
-  if (!fs.existsSync(SESSION)) return null;
-  try { return JSON.parse(fs.readFileSync(SESSION, 'utf8')); }
-  catch (e) { console.error('[session] parse error:', e.message); return null; }
+  // Primary: user-uploaded / runtime session
+  if (fs.existsSync(SESSION)) {
+    try { return JSON.parse(fs.readFileSync(SESSION, 'utf8')); }
+    catch (e) { console.error('[session] parse error:', e.message); }
+  }
+  // Fallback: crew-generated scouting data (committed to repo)
+  if (fs.existsSync(CREW_SESSION)) {
+    try { return JSON.parse(fs.readFileSync(CREW_SESSION, 'utf8')); }
+    catch (e) { console.error('[crew_session] parse error:', e.message); }
+  }
+  return null;
 }
 
 // ── Helper: enrich + persist session ─────────────────────────────────────────
@@ -335,6 +346,142 @@ app.get('/api/data/:filename', (req, res) => {
     .on('data', row => rows.push(row))
     .on('error', err => res.status(500).json({ error: err.message }))
     .on('end', () => res.json({ rows, count: rows.length }));
+});
+
+// ── POST /api/run-agents — spawn CrewAI pipeline, stream output via SSE ──────
+let agentProcess = null;   // track singleton so we can't double-run
+
+app.post('/api/run-agents', (req, res) => {
+  if (agentProcess) {
+    return res.status(409).json({ error: 'Agent pipeline already running' });
+  }
+
+  // Resolve the Python binary inside the agents venv
+  const pythonBin = path.join(AGENTS_DIR, 'venv', 'bin', 'python3');
+  const mainPy    = path.join(AGENTS_DIR, 'main.py');
+
+  if (!fs.existsSync(pythonBin)) {
+    return res.status(500).json({ error: 'Python venv not found. Run setup first.' });
+  }
+  if (!fs.existsSync(mainPy)) {
+    return res.status(500).json({ error: 'agents/main.py not found.' });
+  }
+
+  // SSE headers
+  res.writeHead(200, {
+    'Content-Type':  'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection':    'keep-alive',
+    'X-Accel-Buffering': 'no',      // disable nginx buffering if present
+  });
+
+  const send = (event, data) => {
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
+  send('status', { agent: 'system', message: 'Starting agent pipeline…' });
+
+  agentProcess = spawn(pythonBin, ['-u', mainPy], {
+    cwd:   AGENTS_DIR,
+    env:   { ...process.env, PYTHONUNBUFFERED: '1' },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+
+  // ── Parse stdout for agent-phase detection ──
+  const AGENT_PATTERNS = [
+    { re: /Batter Analyst|scout_batters|opponent.*batter/i,      name: 'Opponent Batter Scout' },
+    { re: /Pitcher Analyst|scout_pitchers|target.*pitcher/i,     name: 'Target Pitcher Scout' },
+    { re: /Matchup Specialist|matchup.*align/i,                  name: 'Matchup Aligner' },
+    { re: /Predictive.*Analytics|season.*predict|Performance/i,  name: 'Season Predictor' },
+  ];
+  let currentAgent = '';
+
+  function processLine(line) {
+    const text = line.toString().trim();
+    if (!text) return;
+
+    // Detect which agent is running
+    for (const { re, name } of AGENT_PATTERNS) {
+      if (re.test(text) && name !== currentAgent) {
+        currentAgent = name;
+        send('agent', { agent: currentAgent });
+        break;
+      }
+    }
+
+    send('log', { agent: currentAgent || 'system', message: text });
+  }
+
+  // Buffer partial lines from stdout / stderr
+  let stdoutBuf = '';
+  agentProcess.stdout.on('data', chunk => {
+    stdoutBuf += chunk.toString();
+    const lines = stdoutBuf.split('\n');
+    stdoutBuf = lines.pop();          // keep incomplete last line
+    lines.forEach(processLine);
+  });
+
+  let stderrBuf = '';
+  agentProcess.stderr.on('data', chunk => {
+    stderrBuf += chunk.toString();
+    const lines = stderrBuf.split('\n');
+    stderrBuf = lines.pop();
+    lines.forEach(l => {
+      const text = l.trim();
+      if (!text) return;
+      send('log', { agent: currentAgent || 'system', message: `[stderr] ${text}` });
+    });
+  });
+
+  agentProcess.on('close', (code) => {
+    // Flush any remaining partial lines
+    if (stdoutBuf.trim()) processLine(stdoutBuf);
+    if (stderrBuf.trim()) send('log', { agent: 'system', message: `[stderr] ${stderrBuf.trim()}` });
+
+    if (code === 0 && fs.existsSync(CREW_SESSION)) {
+      // Enrich the crew output through APPM just like CSV uploads
+      try {
+        const raw = JSON.parse(fs.readFileSync(CREW_SESSION, 'utf8'));
+        const { enriched } = enrichPitchers(raw);
+        fs.writeFileSync(CREW_SESSION, JSON.stringify(enriched, null, 2));
+        send('done', { success: true, pitchers: enriched.length });
+      } catch (err) {
+        send('done', { success: true, pitchers: 0, warning: `Enrich failed: ${err.message}` });
+      }
+    } else {
+      send('done', { success: false, code, error: `Process exited with code ${code}` });
+    }
+
+    agentProcess = null;
+    res.end();
+  });
+
+  agentProcess.on('error', (err) => {
+    send('error', { message: err.message });
+    agentProcess = null;
+    res.end();
+  });
+
+  // If the client disconnects, kill the process
+  req.on('close', () => {
+    if (agentProcess) {
+      agentProcess.kill('SIGTERM');
+      agentProcess = null;
+    }
+  });
+});
+
+// GET /api/crew-session — serve crew_session.json for the hex UI
+app.get('/api/crew-session', (req, res) => {
+  if (!fs.existsSync(CREW_SESSION)) {
+    return res.status(404).json({ error: 'No crew session data. Run scout agents first.' });
+  }
+  try {
+    const data = JSON.parse(fs.readFileSync(CREW_SESSION, 'utf8'));
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to parse crew_session.json', details: err.message });
+  }
 });
 
 // ── Vercel: export app as default; locally: start listening ───────────────────
