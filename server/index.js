@@ -28,6 +28,8 @@ const SESSION      = path.join(DATA_DIR, 'session.json');
 const CREW_SESSION = path.join(DATA_DIR, 'crew_session.json');
 // On Vercel the repo's data/ dir is read-only but still deployed
 const CREW_SESSION_REPO = path.join(__dirname, '../data/crew_session.json');
+const TEAMS_DIR      = path.join(__dirname, '../data/teams');
+const TEAMS_MANIFEST = path.join(TEAMS_DIR, 'manifest.json');
 const AGENTS_DIR   = path.join(__dirname, '../agents');
 const CLIENT_DIR   = path.join(__dirname, '../client');
 
@@ -240,8 +242,48 @@ app.get('/', requireAuth, (_req, res) => {
 // ── Protected: all /api/* routes ─────────────────────────────────────────────
 app.use('/api', requireAuth);
 
-// GET /api/pitchers — serve session.json if present, otherwise live mock
-app.get('/api/pitchers', (_req, res) => {
+// ── Helper: read team manifest ───────────────────────────────────────────────
+function readTeamManifest() {
+  if (!fs.existsSync(TEAMS_MANIFEST)) return [];
+  try { return JSON.parse(fs.readFileSync(TEAMS_MANIFEST, 'utf8')); }
+  catch { return []; }
+}
+
+// ── Helper: read a team's pitcher data ───────────────────────────────────────
+function readTeamData(slug) {
+  const file = path.join(TEAMS_DIR, `${slug}.json`);
+  if (!fs.existsSync(file)) return null;
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')); }
+  catch { return null; }
+}
+
+// GET /api/teams — list available teams (Sample Data first, then alphabetical)
+app.get('/api/teams', (_req, res) => {
+  const manifest = readTeamManifest();
+  const sorted = manifest.slice().sort((a, b) => a.name.localeCompare(b.name));
+  const teams = [
+    { name: 'Sample Data', slug: 'sample' },
+    ...sorted,
+  ];
+  res.json(teams);
+});
+
+// GET /api/pitchers — serve pitcher data; ?team= selects source
+app.get('/api/pitchers', (req, res) => {
+  const team = req.query.team;
+
+  // Explicit team selection
+  if (team && team !== 'sample') {
+    const data = readTeamData(team);
+    if (!data) return res.status(404).json({ error: `Team "${team}" not found` });
+    const { pitchers } = enrichPitchers(data);
+    return res.json(pitchers);
+  }
+
+  // "sample" or no param: session → mock
+  if (team === 'sample') return res.json(generateMockPitchers());
+
+  // Default (no param): session.json → crew_session → mock (backward compat)
   const session = readSession();
   if (session) return res.json(session);
   res.json(generateMockPitchers());

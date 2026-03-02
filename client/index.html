@@ -26,6 +26,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
 .h-btn:hover{color:#fff;border-color:rgba(255,255,255,.25);}
 .h-btn:disabled{opacity:.45;cursor:default;}
 .h-sel{font-size:11px;color:var(--text2);background:var(--bg2);border:1px solid var(--border2);padding:5px 9px;border-radius:6px;cursor:pointer;max-width:140px;outline:none;display:none;}
+.h-sel-team{font-size:11px;color:var(--text2);background:var(--bg2);border:1px solid var(--border2);padding:5px 12px;border-radius:6px;cursor:pointer;max-width:200px;outline:none;}
+.h-sel-team:focus{border-color:var(--orange);}
 /* KPI */
 #kpi{position:fixed;top:52px;left:0;right:0;height:78px;z-index:90;display:flex;background:rgba(11,15,28,.7);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);transition:right .4s ease;}
 #kpi.po{right:380px;}
@@ -135,6 +137,9 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
   <div class="logo-mark">⚾</div>
   <div class="logo-badge">PITCHING HUB</div>
   <div class="h-right">
+    <select class="h-sel-team" id="teamSel">
+      <option value="">Select Team...</option>
+    </select>
     <div class="h-status"><div class="h-dot"></div>Live Metrics</div>
     <input type="file" id="csvInput" accept=".csv" style="display:none">
     <button class="h-btn" id="uploadBtn">⬆ Upload CSV</button>
@@ -884,14 +889,7 @@ function updateKpi(ps=PS){
 }
 
 async function refreshData(){
-  const res=await fetch('/api/pitchers');
-  if(!res.ok)throw new Error(`HTTP ${res.status}`);
-  PS=await res.json();
-  filters.hand.clear();filters.role.clear();filters.tier.clear();
-  document.querySelectorAll('.fg.on').forEach(b=>b.classList.remove('on'));
-  closeP();
-  updateKpi();
-  resize();
+  await loadTeamData(currentTeam);
 }
 
 async function loadSessions(){
@@ -1168,15 +1166,49 @@ function finishScout(success){
   }
 }
 
+// ════ TEAM SELECTOR ════
+let currentTeam='';  // tracks selected team slug
+
+async function loadTeams(){
+  try{
+    const res=await fetch('/api/teams');
+    if(!res.ok)return;
+    const teams=await res.json();
+    const sel=document.getElementById('teamSel');
+    sel.innerHTML=`<option value="">Select Team...</option>`+
+      teams.map(t=>`<option value="${t.slug}">${t.name}</option>`).join('');
+  }catch(err){console.error('Failed to load teams:',err);}
+}
+
+async function loadTeamData(slug){
+  const url=slug&&slug!=='sample'?`/api/pitchers?team=${encodeURIComponent(slug)}`
+    :slug==='sample'?'/api/pitchers?team=sample':'/api/pitchers';
+  const res=await fetch(url);
+  if(!res.ok)throw new Error(`HTTP ${res.status}`);
+  PS=await res.json();
+  filters.hand.clear();filters.role.clear();filters.tier.clear();
+  document.querySelectorAll('.fg.on').forEach(b=>b.classList.remove('on'));
+  closeP();
+  updateKpi();resize();draw();
+}
+
+document.getElementById('teamSel').addEventListener('change',async e=>{
+  const slug=e.target.value;
+  if(!slug)return;
+  currentTeam=slug;
+  try{await loadTeamData(slug);}
+  catch(err){console.error('Team load error:',err);}
+});
+
 // ════ INIT ════
 async function init(){
   try{
-    const res=await fetch('/api/pitchers');
-    if(!res.ok)throw new Error(`HTTP ${res.status}`);
-    PS=await res.json();
-    updateKpi();
-    resize();
-    draw();
+    await loadTeams();
+    // Default to Sample Data on load
+    const sel=document.getElementById('teamSel');
+    sel.value='sample';
+    currentTeam='sample';
+    await loadTeamData('sample');
     loadSessions();
   }catch(err){
     console.error('Failed to load pitchers:',err);
