@@ -26,6 +26,8 @@ const DATA_DIR   = IS_VERCEL
   : path.join(__dirname, '../data');
 const SESSION      = path.join(DATA_DIR, 'session.json');
 const CREW_SESSION = path.join(DATA_DIR, 'crew_session.json');
+// On Vercel the repo's data/ dir is read-only but still deployed
+const CREW_SESSION_REPO = path.join(__dirname, '../data/crew_session.json');
 const AGENTS_DIR   = path.join(__dirname, '../agents');
 const CLIENT_DIR   = path.join(__dirname, '../client');
 
@@ -151,10 +153,12 @@ function readSession() {
     try { return JSON.parse(fs.readFileSync(SESSION, 'utf8')); }
     catch (e) { console.error('[session] parse error:', e.message); }
   }
-  // Fallback: crew-generated scouting data (committed to repo)
-  if (fs.existsSync(CREW_SESSION)) {
-    try { return JSON.parse(fs.readFileSync(CREW_SESSION, 'utf8')); }
-    catch (e) { console.error('[crew_session] parse error:', e.message); }
+  // Fallback: crew-generated scouting data (/tmp on Vercel, data/ locally)
+  for (const p of [CREW_SESSION, CREW_SESSION_REPO]) {
+    if (fs.existsSync(p)) {
+      try { return JSON.parse(fs.readFileSync(p, 'utf8')); }
+      catch (e) { console.error(`[crew_session] parse error (${p}):`, e.message); }
+    }
   }
   return null;
 }
