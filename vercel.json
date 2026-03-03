@@ -5,7 +5,7 @@
       "src": "server/index.js",
       "use": "@vercel/node",
       "config": {
-        "includeFiles": ["data/crew_session.json", "data/teams/**", "client/**"]
+        "includeFiles": ["data/crew_session.json", "data/teams/**", "data/school_registry.json", "client/**"]
       }
     }
   ],

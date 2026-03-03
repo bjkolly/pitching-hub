@@ -12,6 +12,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { TrackmanClient, normalizePitches } from './trackman.js';
 import { enrichPitchers } from './appm.js';
+import { importTeam, searchSchools } from './scraper.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -30,6 +31,12 @@ const CREW_SESSION = path.join(DATA_DIR, 'crew_session.json');
 const CREW_SESSION_REPO = path.join(__dirname, '../data/crew_session.json');
 const TEAMS_DIR      = path.join(__dirname, '../data/teams');
 const TEAMS_MANIFEST = path.join(TEAMS_DIR, 'manifest.json');
+const SCHOOL_REGISTRY = path.join(__dirname, '../data/school_registry.json');
+// Runtime teams dir: writable on both local and Vercel (/tmp)
+const RUNTIME_TEAMS_DIR = IS_VERCEL
+  ? path.join(DATA_DIR, 'teams')
+  : path.join(__dirname, '../data/teams');
+const RUNTIME_MANIFEST  = path.join(RUNTIME_TEAMS_DIR, 'manifest.json');
 const AGENTS_DIR   = path.join(__dirname, '../agents');
 const CLIENT_DIR   = path.join(__dirname, '../client');
 
@@ -242,19 +249,47 @@ app.get('/', requireAuth, (_req, res) => {
 // ── Protected: all /api/* routes ─────────────────────────────────────────────
 app.use('/api', requireAuth);
 
-// ── Helper: read team manifest ───────────────────────────────────────────────
+// ── Helper: read team manifest (merges repo + runtime dirs for Vercel) ───────
 function readTeamManifest() {
-  if (!fs.existsSync(TEAMS_MANIFEST)) return [];
-  try { return JSON.parse(fs.readFileSync(TEAMS_MANIFEST, 'utf8')); }
-  catch { return []; }
+  const teams = [];
+  const seen = new Set();
+
+  // Repo manifest (always present, read-only on Vercel)
+  if (fs.existsSync(TEAMS_MANIFEST)) {
+    try {
+      for (const t of JSON.parse(fs.readFileSync(TEAMS_MANIFEST, 'utf8'))) {
+        if (!seen.has(t.slug)) { teams.push(t); seen.add(t.slug); }
+      }
+    } catch { /* ignore */ }
+  }
+
+  // Runtime manifest (imports on Vercel go to /tmp)
+  if (RUNTIME_MANIFEST !== TEAMS_MANIFEST && fs.existsSync(RUNTIME_MANIFEST)) {
+    try {
+      for (const t of JSON.parse(fs.readFileSync(RUNTIME_MANIFEST, 'utf8'))) {
+        if (!seen.has(t.slug)) { teams.push(t); seen.add(t.slug); }
+      }
+    } catch { /* ignore */ }
+  }
+
+  return teams;
 }
 
-// ── Helper: read a team's pitcher data ───────────────────────────────────────
+// ── Helper: read a team's pitcher data (checks runtime then repo) ────────────
 function readTeamData(slug) {
-  const file = path.join(TEAMS_DIR, `${slug}.json`);
-  if (!fs.existsSync(file)) return null;
-  try { return JSON.parse(fs.readFileSync(file, 'utf8')); }
-  catch { return null; }
+  // Check runtime dir first (newly imported teams), then repo dir
+  const dirs = RUNTIME_TEAMS_DIR !== TEAMS_DIR
+    ? [RUNTIME_TEAMS_DIR, TEAMS_DIR]
+    : [TEAMS_DIR];
+
+  for (const dir of dirs) {
+    const file = path.join(dir, `${slug}.json`);
+    if (fs.existsSync(file)) {
+      try { return JSON.parse(fs.readFileSync(file, 'utf8')); }
+      catch { /* continue */ }
+    }
+  }
+  return null;
 }
 
 // GET /api/teams — list available teams (Sample Data first, then alphabetical)
@@ -515,6 +550,159 @@ app.post('/api/run-agents', (req, res) => {
       agentProcess = null;
     }
   });
+});
+
+// ── School Import Endpoints ──────────────────────────────────────────────────
+
+// GET /api/schools/search?q= — fuzzy search against school registry
+app.get('/api/schools/search', (req, res) => {
+  const q = (req.query.q || '').trim();
+  if (!q) return res.json([]);
+  res.json(searchSchools(q));
+});
+
+// POST /api/schools/resolve — LLM fallback for ambiguous queries
+let _resolveInFlight = false;
+app.post('/api/schools/resolve', async (req, res) => {
+  const { query } = req.body || {};
+  if (!query) return res.status(400).json({ error: 'No query provided' });
+
+  const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+  if (!ANTHROPIC_API_KEY) {
+    return res.status(501).json({ error: 'LLM resolution not configured (ANTHROPIC_API_KEY missing)' });
+  }
+
+  if (_resolveInFlight) {
+    return res.status(429).json({ error: 'Resolve already in progress' });
+  }
+  _resolveInFlight = true;
+
+  try {
+    let registry;
+    try { registry = JSON.parse(fs.readFileSync(SCHOOL_REGISTRY, 'utf8')); }
+    catch { return res.status(500).json({ error: 'School registry not found' }); }
+
+    const schoolNames = registry.map(s => s.name).join(', ');
+
+    const apiResp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 200,
+        messages: [{
+          role: 'user',
+          content: `Given this list of NCAA D1 baseball schools:\n${schoolNames}\n\nThe user searched for: "${query}"\n\nWhich school did they most likely mean? Respond with ONLY the exact school name from the list, or "NONE" if no match is reasonable. Do not explain.`,
+        }],
+      }),
+      signal: AbortSignal.timeout(15_000),
+    });
+
+    const data = await apiResp.json();
+    const answer = data.content?.[0]?.text?.trim();
+
+    if (!answer || answer === 'NONE') {
+      return res.json({ resolved: null, message: 'No match found' });
+    }
+
+    const match = registry.find(s => s.name.toLowerCase() === answer.toLowerCase());
+    if (match) return res.json({ resolved: match });
+
+    // Partial match: try includes
+    const partial = registry.find(s =>
+      s.name.toLowerCase().includes(answer.toLowerCase()) ||
+      answer.toLowerCase().includes(s.name.toLowerCase())
+    );
+    if (partial) return res.json({ resolved: partial });
+
+    res.json({ resolved: null, message: `LLM suggested "${answer}" but no registry match` });
+  } catch (err) {
+    console.error('[resolve] LLM error:', err.message);
+    res.status(500).json({ error: `LLM resolution failed: ${err.message}` });
+  } finally {
+    _resolveInFlight = false;
+  }
+});
+
+// POST /api/schools/import — scrape, analyse, import a school (SSE streaming)
+let _importInFlight = false;
+app.post('/api/schools/import', async (req, res) => {
+  if (_importInFlight) {
+    return res.status(409).json({ error: 'Import already in progress' });
+  }
+
+  const { ncaa_id, name } = req.body || {};
+  if (!ncaa_id || !name) {
+    return res.status(400).json({ error: 'Missing ncaa_id or name' });
+  }
+
+  const slug = (req.body.slug || name)
+    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
+  // SSE headers
+  res.writeHead(200, {
+    'Content-Type':      'text/event-stream',
+    'Cache-Control':     'no-cache',
+    'Connection':        'keep-alive',
+    'X-Accel-Buffering': 'no',
+  });
+
+  const send = (event, data) => {
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
+  _importInFlight = true;
+  send('status', { step: 'start', message: `Importing ${name}...` });
+
+  try {
+    // 1. Scrape + compute metrics
+    const entries = await importTeam(ncaa_id, name, (progress) => {
+      send('progress', progress);
+    });
+
+    // 2. Enrich via APPM
+    const { pitchers } = enrichPitchers(entries);
+    send('progress', { step: 'enrich', message: `APPM enrichment complete`, pct: 95 });
+
+    // 3. Write team JSON
+    if (!fs.existsSync(RUNTIME_TEAMS_DIR)) fs.mkdirSync(RUNTIME_TEAMS_DIR, { recursive: true });
+    const teamFile = path.join(RUNTIME_TEAMS_DIR, `${slug}.json`);
+    fs.writeFileSync(teamFile, JSON.stringify(pitchers, null, 2));
+
+    // 4. Update manifest (runtime manifest for Vercel, repo manifest locally)
+    const manifestPath = IS_VERCEL ? RUNTIME_MANIFEST : TEAMS_MANIFEST;
+    let manifest = [];
+    if (fs.existsSync(manifestPath)) {
+      try { manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')); } catch { manifest = []; }
+    }
+    if (!manifest.find(t => t.slug === slug)) {
+      manifest.push({ name, slug });
+      manifest.sort((a, b) => a.name.localeCompare(b.name));
+      fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+    }
+
+    send('done', {
+      success: true, slug, name,
+      pitchers: pitchers.length,
+      message: `Successfully imported ${pitchers.length} pitchers for ${name}`,
+    });
+  } catch (err) {
+    console.error('[import] Error:', err.message);
+    send('done', {
+      success: false,
+      error: err.message,
+      message: `Import failed: ${err.message}`,
+    });
+  } finally {
+    _importInFlight = false;
+    res.end();
+  }
+
+  req.on('close', () => { _importInFlight = false; });
 });
 
 // GET /api/crew-session — serve crew_session.json for the hex UI
