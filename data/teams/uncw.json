@@ -1,0 +1,1311 @@
+[
+  {
+    "id": 0,
+    "name": "Taylor, Z.",
+    "hand": "RHP",
+    "role": "SP",
+    "metrics": {
+      "stuffPlus": 160,
+      "cswPct": 34.0,
+      "whiffPct": 36.6,
+      "kPct": 29.3,
+      "bbPct": 3.1,
+      "hardHitPct": 33.0,
+      "tunnelingScore": 50,
+      "seqScore": 50,
+      "avgVelo": 0,
+      "avgSpin": 0,
+      "ivb": 0,
+      "hBreak": 0,
+      "chasePct": 20,
+      "zonePct": 50,
+      "score": 90,
+      "stuffPlusRaw": 149
+    },
+    "pitchData": {
+      "pitches": [],
+      "types": []
+    },
+    "history": [
+      90,
+      90,
+      90,
+      90,
+      90,
+      90,
+      90,
+      90,
+      90,
+      90
+    ],
+    "predictions": [
+      90,
+      91,
+      91
+    ],
+    "rank": 1,
+    "predBands": [
+      {
+        "value": 90,
+        "lower": 84,
+        "upper": 96
+      },
+      {
+        "value": 91,
+        "lower": 85,
+        "upper": 97
+      },
+      {
+        "value": 91,
+        "lower": 85,
+        "upper": 97
+      }
+    ],
+    "formStatus": "neutral",
+    "formDelta": 0,
+    "trendStrength": 0.1,
+    "riskFlag": null,
+    "ceiling": 96,
+    "floor": 84,
+    "game_by_game": [],
+    "season_summary": {
+      "projected_era": 1.98,
+      "projected_k9": 9.9,
+      "projected_bb9": 1.0,
+      "win_probability_avg": 0.5,
+      "stuff_plus_projection": 160
+    }
+  },
+  {
+    "id": 1,
+    "name": "Lawson, T.",
+    "hand": "RHP",
+    "role": "RP",
+    "metrics": {
+      "stuffPlus": 147,
+      "cswPct": 31.5,
+      "whiffPct": 32.5,
+      "kPct": 26.0,
+      "bbPct": 3.2,
+      "hardHitPct": 33.0,
+      "tunnelingScore": 50,
+      "seqScore": 50,
+      "avgVelo": 0,
+      "avgSpin": 0,
+      "ivb": 0,
+      "hBreak": 0,
+      "chasePct": 20,
+      "zonePct": 50,
+      "score": 84,
+      "stuffPlusRaw": 138
+    },
+    "pitchData": {
+      "pitches": [],
+      "types": []
+    },
+    "history": [
+      84,
+      84,
+      84,
+      84,
+      84,
+      84,
+      84,
+      84,
+      84,
+      84
+    ],
+    "predictions": [
+      84,
+      85,
+      85
+    ],
+    "rank": 2,
+    "predBands": [
+      {
+        "value": 84,
+        "lower": 78,
+        "upper": 90
+      },
+      {
+        "value": 85,
+        "lower": 79,
+        "upper": 91
+      },
+      {
+        "value": 85,
+        "lower": 79,
+        "upper": 91
+      }
+    ],
+    "formStatus": "neutral",
+    "formDelta": 0,
+    "trendStrength": 0.1,
+    "riskFlag": null,
+    "ceiling": 90,
+    "floor": 78,
+    "game_by_game": [],
+    "season_summary": {
+      "projected_era": 2.87,
+      "projected_k9": 9.5,
+      "projected_bb9": 1.2,
+      "win_probability_avg": 0.5,
+      "stuff_plus_projection": 147
+    }
+  },
+  {
+    "id": 2,
+    "name": "Baker, T.",
+    "hand": "RHP",
+    "role": "RP",
+    "metrics": {
+      "stuffPlus": 136,
+      "cswPct": 31.4,
+      "whiffPct": 32.4,
+      "kPct": 25.9,
+      "bbPct": 7.7,
+      "hardHitPct": 33.0,
+      "tunnelingScore": 50,
+      "seqScore": 50,
+      "avgVelo": 0,
+      "avgSpin": 0,
+      "ivb": 0,
+      "hBreak": 0,
+      "chasePct": 20,
+      "zonePct": 50,
+      "score": 75,
+      "stuffPlusRaw": 125
+    },
+    "pitchData": {
+      "pitches": [],
+      "types": []
+    },
+    "history": [
+      75,
+      75,
+      75,
+      75,
+      75,
+      75,
+      75,
+      75,
+      75,
+      75
+    ],
+    "predictions": [
+      75,
+      76,
+      76
+    ],
+    "rank": 3,
+    "predBands": [
+      {
+        "value": 75,
+        "lower": 70,
+        "upper": 80
+      },
+      {
+        "value": 76,
+        "lower": 71,
+        "upper": 81
+      },
+      {
+        "value": 76,
+        "lower": 71,
+        "upper": 81
+      }
+    ],
+    "formStatus": "neutral",
+    "formDelta": 0,
+    "trendStrength": 0.1,
+    "riskFlag": null,
+    "ceiling": 80,
+    "floor": 70,
+    "game_by_game": [],
+    "season_summary": {
+      "projected_era": 2.24,
+      "projected_k9": 9.3,
+      "projected_bb9": 2.8,
+      "win_probability_avg": 0.5,
+      "stuff_plus_projection": 136
+    }
+  },
+  {
+    "id": 3,
+    "name": "Allen, C.",
+    "hand": "RHP",
+    "role": "RP",
+    "metrics": {
+      "stuffPlus": 130,
+      "cswPct": 33.7,
+      "whiffPct": 36.1,
+      "kPct": 28.9,
+      "bbPct": 8.1,
+      "hardHitPct": 33.0,
+      "tunnelingScore": 50,
+      "seqScore": 50,
+      "avgVelo": 0,
+      "avgSpin": 0,
+      "ivb": 0,
+      "hBreak": 0,
+      "chasePct": 20,
+      "zonePct": 50,
+      "score": 73,
+      "stuffPlusRaw": 132
+    },
+    "pitchData": {
+      "pitches": [],
+      "types": []
+    },
+    "history": [
+      73,
+      73,
+      73,
+      73,
+      73,
+      73,
+      73,
+      73,
+      73,
+      73
+    ],
+    "predictions": [
+      73,
+      74,
+      74
+    ],
+    "rank": 4,
+    "predBands": [
+      {
+        "value": 73,
+        "lower": 68,
+        "upper": 78
+      },
+      {
+        "value": 74,
+        "lower": 69,
+        "upper": 79
+      },
+      {
+        "value": 74,
+        "lower": 69,
+        "upper": 79
+      }
+    ],
+    "formStatus": "neutral",
+    "formDelta": 0,
+    "trendStrength": 0.1,
+    "riskFlag": null,
+    "ceiling": 78,
+    "floor": 68,
+    "game_by_game": [],
+    "season_summary": {
+      "projected_era": 5.05,
+      "projected_k9": 11.0,
+      "projected_bb9": 3.1,
+      "win_probability_avg": 0.5,
+      "stuff_plus_projection": 130
+    }
+  },
+  {
+    "id": 4,
+    "name": "Smith, A.",
+    "hand": "RHP",
+    "role": "RP",
+    "metrics": {
+      "stuffPlus": 124,
+      "cswPct": 27.6,
+      "whiffPct": 26.0,
+      "kPct": 20.8,
+      "bbPct": 5.2,
+      "hardHitPct": 33.0,
+      "tunnelingScore": 50,
+      "seqScore": 50,
+      "avgVelo": 0,
+      "avgSpin": 0,
+      "ivb": 0,
+      "hBreak": 0,
+      "chasePct": 20,
+      "zonePct": 50,
+      "score": 72,
+      "stuffPlusRaw": 117
+    },
+    "pitchData": {
+      "pitches": [],
+      "types": []
+    },
+    "history": [
+      72,
+      72,
+      72,
+      72,
+      72,
+      72,
+      72,
+      72,
+      72,
+      72
+    ],
+    "predictions": [
+      72,
+      73,
+      73
+    ],
+    "rank": 5,
+    "predBands": [
+      {
+        "value": 72,
+        "lower": 67,
+        "upper": 77
+      },
+      {
+        "value": 73,
+        "lower": 68,
+        "upper": 78
+      },
+      {
+        "value": 73,
+        "lower": 68,
+        "upper": 78
+      }
+    ],
+    "formStatus": "neutral",
+    "formDelta": 0,
+    "trendStrength": 0.1,
+    "riskFlag": null,
+    "ceiling": 77,
+    "floor": 67,
+    "game_by_game": [],
+    "season_summary": {
+      "projected_era": 3.1,
+      "projected_k9": 7.6,
+      "projected_bb9": 1.9,
+      "win_probability_avg": 0.5,
+      "stuff_plus_projection": 124
+    }
+  },
+  {
+    "id": 5,
+    "name": "Bagwell, C.",
+    "hand": "RHP",
+    "role": "SP",
+    "metrics": {
+      "stuffPlus": 117,
+      "cswPct": 25.5,
+      "whiffPct": 22.5,
+      "kPct": 18.0,
+      "bbPct": 4.9,
+      "hardHitPct": 33.0,
+      "tunnelingScore": 50,
+      "seqScore": 50,
+      "avgVelo": 0,
+      "avgSpin": 0,
+      "ivb": 0,
+      "hBreak": 0,
+      "chasePct": 20,
+      "zonePct": 50,
+      "score": 69,
+      "stuffPlusRaw": 109
+    },
+    "pitchData": {
+      "pitches": [],
+      "types": []
+    },
+    "history": [
+      69,
+      69,
+      69,
+      69,
+      69,
+      69,
+      69,
+      69,
+      69,
+      69
+    ],
+    "predictions": [
+      69,
+      70,
+      70
+    ],
+    "rank": 6,
+    "predBands": [
+      {
+        "value": 69,
+        "lower": 64,
+        "upper": 74
+      },
+      {
+        "value": 70,
+        "lower": 65,
+        "upper": 75
+      },
+      {
+        "value": 70,
+        "lower": 65,
+        "upper": 75
+      }
+    ],
+    "formStatus": "neutral",
+    "formDelta": 0,
+    "trendStrength": 0.1,
+    "riskFlag": null,
+    "ceiling": 74,
+    "floor": 64,
+    "game_by_game": [],
+    "season_summary": {
+      "projected_era": 3.07,
+      "projected_k9": 6.6,
+      "projected_bb9": 1.8,
+      "win_probability_avg": 0.5,
+      "stuff_plus_projection": 117
+    }
+  },
+  {
+    "id": 6,
+    "name": "Marshburn, C.",
+    "hand": "RHP",
+    "role": "SP",
+    "metrics": {
+      "stuffPlus": 105,
+      "cswPct": 28.3,
+      "whiffPct": 27.2,
+      "kPct": 21.8,
+      "bbPct": 11.8,
+      "hardHitPct": 33.0,
+      "tunnelingScore": 50,
+      "seqScore": 50,
+      "avgVelo": 0,
+      "avgSpin": 0,
+      "ivb": 0,
+      "hBreak": 0,
+      "chasePct": 20,
+      "zonePct": 50,
+      "score": 58,
+      "stuffPlusRaw": 100
+    },
+    "pitchData": {
+      "pitches": [],
+      "types": []
+    },
+    "history": [
+      58,
+      58,
+      58,
+      58,
+      58,
+      58,
+      58,
+      58,
+      58,
+      58
+    ],
+    "predictions": [
+      58,
+      59,
+      59
+    ],
+    "rank": 7,
+    "predBands": [
+      {
+        "value": 58,
+        "lower": 54,
+        "upper": 62
+      },
+      {
+        "value": 59,
+        "lower": 55,
+        "upper": 63
+      },
+      {
+        "value": 59,
+        "lower": 55,
+        "upper": 63
+      }
+    ],
+    "formStatus": "neutral",
+    "formDelta": 0,
+    "trendStrength": 0.1,
+    "riskFlag": null,
+    "ceiling": 62,
+    "floor": 54,
+    "game_by_game": [],
+    "season_summary": {
+      "projected_era": 3.51,
+      "projected_k9": 8.3,
+      "projected_bb9": 4.5,
+      "win_probability_avg": 0.5,
+      "stuff_plus_projection": 105
+    }
+  },
+  {
+    "id": 7,
+    "name": "Cox, B.",
+    "hand": "LHP",
+    "role": "RP",
+    "metrics": {
+      "stuffPlus": 98,
+      "cswPct": 27.0,
+      "whiffPct": 25.0,
+      "kPct": 20.0,
+      "bbPct": 11.2,
+      "hardHitPct": 33.0,
+      "tunnelingScore": 50,
+      "seqScore": 50,
+      "avgVelo": 0,
+      "avgSpin": 0,
+      "ivb": 0,
+      "hBreak": 0,
+      "chasePct": 20,
+      "zonePct": 50,
+      "score": 55,
+      "stuffPlusRaw": 96
+    },
+    "pitchData": {
+      "pitches": [],
+      "types": []
+    },
+    "history": [
+      55,
+      55,
+      55,
+      55,
+      55,
+      55,
+      55,
+      55,
+      55,
+      55
+    ],
+    "predictions": [
+      55,
+      56,
+      56
+    ],
+    "rank": 8,
+    "predBands": [
+      {
+        "value": 55,
+        "lower": 51,
+        "upper": 59
+      },
+      {
+        "value": 56,
+        "lower": 52,
+        "upper": 60
+      },
+      {
+        "value": 56,
+        "lower": 52,
+        "upper": 60
+      }
+    ],
+    "formStatus": "neutral",
+    "formDelta": 0,
+    "trendStrength": 0.1,
+    "riskFlag": null,
+    "ceiling": 59,
+    "floor": 51,
+    "game_by_game": [],
+    "season_summary": {
+      "projected_era": 4.34,
+      "projected_k9": 7.8,
+      "projected_bb9": 4.3,
+      "win_probability_avg": 0.5,
+      "stuff_plus_projection": 98
+    }
+  },
+  {
+    "id": 8,
+    "name": "Thornton, B.",
+    "hand": "RHP",
+    "role": "RP",
+    "metrics": {
+      "stuffPlus": 76,
+      "cswPct": 27.1,
+      "whiffPct": 25.2,
+      "kPct": 20.2,
+      "bbPct": 10.1,
+      "hardHitPct": 33.0,
+      "tunnelingScore": 50,
+      "seqScore": 50,
+      "avgVelo": 0,
+      "avgSpin": 0,
+      "ivb": 0,
+      "hBreak": 0,
+      "chasePct": 20,
+      "zonePct": 50,
+      "score": 49,
+      "stuffPlusRaw": 100
+    },
+    "pitchData": {
+      "pitches": [],
+      "types": []
+    },
+    "history": [
+      49,
+      49,
+      49,
+      49,
+      49,
+      49,
+      49,
+      49,
+      49,
+      49
+    ],
+    "predictions": [
+      49,
+      50,
+      50
+    ],
+    "rank": 9,
+    "predBands": [
+      {
+        "value": 49,
+        "lower": 45,
+        "upper": 53
+      },
+      {
+        "value": 50,
+        "lower": 46,
+        "upper": 54
+      },
+      {
+        "value": 50,
+        "lower": 46,
+        "upper": 54
+      }
+    ],
+    "formStatus": "neutral",
+    "formDelta": 0,
+    "trendStrength": 0.1,
+    "riskFlag": null,
+    "ceiling": 53,
+    "floor": 45,
+    "game_by_game": [],
+    "season_summary": {
+      "projected_era": 9.37,
+      "projected_k9": 8.9,
+      "projected_bb9": 4.5,
+      "win_probability_avg": 0.5,
+      "stuff_plus_projection": 76
+    }
+  },
+  {
+    "id": 9,
+    "name": "Everett, J.",
+    "hand": "LHP",
+    "role": "RP",
+    "metrics": {
+      "stuffPlus": 70,
+      "cswPct": 25.1,
+      "whiffPct": 21.8,
+      "kPct": 17.4,
+      "bbPct": 8.7,
+      "hardHitPct": 33.0,
+      "tunnelingScore": 50,
+      "seqScore": 50,
+      "avgVelo": 0,
+      "avgSpin": 0,
+      "ivb": 0,
+      "hBreak": 0,
+      "chasePct": 20,
+      "zonePct": 50,
+      "score": 48,
+      "stuffPlusRaw": 96
+    },
+    "pitchData": {
+      "pitches": [],
+      "types": []
+    },
+    "history": [
+      48,
+      48,
+      48,
+      48,
+      48,
+      48,
+      48,
+      48,
+      48,
+      48
+    ],
+    "predictions": [
+      48,
+      49,
+      49
+    ],
+    "rank": 10,
+    "predBands": [
+      {
+        "value": 48,
+        "lower": 44,
+        "upper": 52
+      },
+      {
+        "value": 49,
+        "lower": 45,
+        "upper": 53
+      },
+      {
+        "value": 49,
+        "lower": 45,
+        "upper": 53
+      }
+    ],
+    "formStatus": "neutral",
+    "formDelta": 0,
+    "trendStrength": 0.1,
+    "riskFlag": null,
+    "ceiling": 52,
+    "floor": 44,
+    "game_by_game": [],
+    "season_summary": {
+      "projected_era": 18.0,
+      "projected_k9": 9.0,
+      "projected_bb9": 4.5,
+      "win_probability_avg": 0.5,
+      "stuff_plus_projection": 70
+    }
+  },
+  {
+    "id": 10,
+    "name": "Arendt, B.",
+    "hand": "RHP",
+    "role": "RP",
+    "metrics": {
+      "stuffPlus": 89,
+      "cswPct": 26.6,
+      "whiffPct": 24.4,
+      "kPct": 19.5,
+      "bbPct": 15.6,
+      "hardHitPct": 33.0,
+      "tunnelingScore": 50,
+      "seqScore": 50,
+      "avgVelo": 0,
+      "avgSpin": 0,
+      "ivb": 0,
+      "hBreak": 0,
+      "chasePct": 20,
+      "zonePct": 50,
+      "score": 47,
+      "stuffPlusRaw": 82
+    },
+    "pitchData": {
+      "pitches": [],
+      "types": []
+    },
+    "history": [
+      47,
+      47,
+      47,
+      47,
+      47,
+      47,
+      47,
+      47,
+      47,
+      47
+    ],
+    "predictions": [
+      47,
+      48,
+      48
+    ],
+    "rank": 11,
+    "predBands": [
+      {
+        "value": 47,
+        "lower": 43,
+        "upper": 51
+      },
+      {
+        "value": 48,
+        "lower": 44,
+        "upper": 52
+      },
+      {
+        "value": 48,
+        "lower": 44,
+        "upper": 52
+      }
+    ],
+    "formStatus": "neutral",
+    "formDelta": 0,
+    "trendStrength": 0.1,
+    "riskFlag": null,
+    "ceiling": 51,
+    "floor": 43,
+    "game_by_game": [],
+    "season_summary": {
+      "projected_era": 3.18,
+      "projected_k9": 8.7,
+      "projected_bb9": 6.9,
+      "win_probability_avg": 0.5,
+      "stuff_plus_projection": 89
+    }
+  },
+  {
+    "id": 11,
+    "name": "Kane, C.",
+    "hand": "RHP",
+    "role": "RP",
+    "metrics": {
+      "stuffPlus": 70,
+      "cswPct": 22.1,
+      "whiffPct": 16.8,
+      "kPct": 13.4,
+      "bbPct": 13.4,
+      "hardHitPct": 33.0,
+      "tunnelingScore": 50,
+      "seqScore": 50,
+      "avgVelo": 0,
+      "avgSpin": 0,
+      "ivb": 0,
+      "hBreak": 0,
+      "chasePct": 20,
+      "zonePct": 50,
+      "score": 41,
+      "stuffPlusRaw": 70
+    },
+    "pitchData": {
+      "pitches": [],
+      "types": []
+    },
+    "history": [
+      41,
+      41,
+      41,
+      41,
+      41,
+      41,
+      41,
+      41,
+      41,
+      41
+    ],
+    "predictions": [
+      41,
+      42,
+      42
+    ],
+    "rank": 12,
+    "predBands": [
+      {
+        "value": 41,
+        "lower": 37,
+        "upper": 45
+      },
+      {
+        "value": 42,
+        "lower": 38,
+        "upper": 46
+      },
+      {
+        "value": 42,
+        "lower": 38,
+        "upper": 46
+      }
+    ],
+    "formStatus": "neutral",
+    "formDelta": 0,
+    "trendStrength": 0.1,
+    "riskFlag": null,
+    "ceiling": 45,
+    "floor": 37,
+    "game_by_game": [],
+    "season_summary": {
+      "projected_era": 7.36,
+      "projected_k9": 6.3,
+      "projected_bb9": 6.3,
+      "win_probability_avg": 0.5,
+      "stuff_plus_projection": 70
+    }
+  },
+  {
+    "id": 12,
+    "name": "Phelan, C.",
+    "hand": "LHP",
+    "role": "RP",
+    "metrics": {
+      "stuffPlus": 80,
+      "cswPct": 33.0,
+      "whiffPct": 35.0,
+      "kPct": 28.0,
+      "bbPct": 21.0,
+      "hardHitPct": 33.0,
+      "tunnelingScore": 50,
+      "seqScore": 50,
+      "avgVelo": 0,
+      "avgSpin": 0,
+      "ivb": 0,
+      "hBreak": 0,
+      "chasePct": 20,
+      "zonePct": 50,
+      "score": 39,
+      "stuffPlusRaw": 91
+    },
+    "pitchData": {
+      "pitches": [],
+      "types": []
+    },
+    "history": [
+      39,
+      39,
+      39,
+      39,
+      39,
+      39,
+      39,
+      39,
+      39,
+      39
+    ],
+    "predictions": [
+      39,
+      40,
+      40
+    ],
+    "rank": 13,
+    "predBands": [
+      {
+        "value": 39,
+        "lower": 35,
+        "upper": 43
+      },
+      {
+        "value": 40,
+        "lower": 36,
+        "upper": 44
+      },
+      {
+        "value": 40,
+        "lower": 36,
+        "upper": 44
+      }
+    ],
+    "formStatus": "neutral",
+    "formDelta": 0,
+    "trendStrength": 0.1,
+    "riskFlag": null,
+    "ceiling": 43,
+    "floor": 35,
+    "game_by_game": [],
+    "season_summary": {
+      "projected_era": 6.75,
+      "projected_k9": 11.9,
+      "projected_bb9": 8.9,
+      "win_probability_avg": 0.5,
+      "stuff_plus_projection": 80
+    }
+  },
+  {
+    "id": 13,
+    "name": "Braddy, P.",
+    "hand": "LHP",
+    "role": "RP",
+    "metrics": {
+      "stuffPlus": 70,
+      "cswPct": 27.0,
+      "whiffPct": 25.0,
+      "kPct": 20.0,
+      "bbPct": 20.0,
+      "hardHitPct": 33.0,
+      "tunnelingScore": 50,
+      "seqScore": 50,
+      "avgVelo": 0,
+      "avgSpin": 0,
+      "ivb": 0,
+      "hBreak": 0,
+      "chasePct": 20,
+      "zonePct": 50,
+      "score": 35,
+      "stuffPlusRaw": 70
+    },
+    "pitchData": {
+      "pitches": [],
+      "types": []
+    },
+    "history": [
+      35,
+      35,
+      35,
+      35,
+      35,
+      35,
+      35,
+      35,
+      35,
+      35
+    ],
+    "predictions": [
+      35,
+      36,
+      36
+    ],
+    "rank": 14,
+    "predBands": [
+      {
+        "value": 35,
+        "lower": 31,
+        "upper": 39
+      },
+      {
+        "value": 36,
+        "lower": 32,
+        "upper": 40
+      },
+      {
+        "value": 36,
+        "lower": 32,
+        "upper": 40
+      }
+    ],
+    "formStatus": "neutral",
+    "formDelta": 0,
+    "trendStrength": 0.1,
+    "riskFlag": null,
+    "ceiling": 39,
+    "floor": 31,
+    "game_by_game": [],
+    "season_summary": {
+      "projected_era": 4.5,
+      "projected_k9": 9.0,
+      "projected_bb9": 9.0,
+      "win_probability_avg": 0.5,
+      "stuff_plus_projection": 70
+    }
+  },
+  {
+    "id": 14,
+    "name": "Murdock, M.",
+    "hand": "RHP",
+    "role": "RP",
+    "metrics": {
+      "stuffPlus": 70,
+      "cswPct": 26.7,
+      "whiffPct": 24.5,
+      "kPct": 19.6,
+      "bbPct": 27.5,
+      "hardHitPct": 33.0,
+      "tunnelingScore": 50,
+      "seqScore": 50,
+      "avgVelo": 0,
+      "avgSpin": 0,
+      "ivb": 0,
+      "hBreak": 0,
+      "chasePct": 20,
+      "zonePct": 50,
+      "score": 25,
+      "stuffPlusRaw": 46
+    },
+    "pitchData": {
+      "pitches": [],
+      "types": []
+    },
+    "history": [
+      25,
+      25,
+      25,
+      25,
+      25,
+      25,
+      25,
+      25,
+      25,
+      25
+    ],
+    "predictions": [
+      25,
+      26,
+      26
+    ],
+    "rank": 15,
+    "predBands": [
+      {
+        "value": 25,
+        "lower": 21,
+        "upper": 29
+      },
+      {
+        "value": 26,
+        "lower": 22,
+        "upper": 30
+      },
+      {
+        "value": 26,
+        "lower": 22,
+        "upper": 30
+      }
+    ],
+    "formStatus": "neutral",
+    "formDelta": 0,
+    "trendStrength": 0.1,
+    "riskFlag": null,
+    "ceiling": 29,
+    "floor": 21,
+    "game_by_game": [],
+    "season_summary": {
+      "projected_era": 9.0,
+      "projected_k9": 10.0,
+      "projected_bb9": 14.0,
+      "win_probability_avg": 0.5,
+      "stuff_plus_projection": 70
+    }
+  },
+  {
+    "id": 15,
+    "name": "Gibson, J.",
+    "hand": "LHP",
+    "role": "RP",
+    "metrics": {
+      "stuffPlus": 70,
+      "cswPct": 15.5,
+      "whiffPct": 5.9,
+      "kPct": 4.7,
+      "bbPct": 28.2,
+      "hardHitPct": 33.0,
+      "tunnelingScore": 50,
+      "seqScore": 50,
+      "avgVelo": 0,
+      "avgSpin": 0,
+      "ivb": 0,
+      "hBreak": 0,
+      "chasePct": 20,
+      "zonePct": 50,
+      "score": 21,
+      "stuffPlusRaw": 30
+    },
+    "pitchData": {
+      "pitches": [],
+      "types": []
+    },
+    "history": [
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21
+    ],
+    "predictions": [
+      21,
+      22,
+      22
+    ],
+    "rank": 16,
+    "predBands": [
+      {
+        "value": 21,
+        "lower": 17,
+        "upper": 25
+      },
+      {
+        "value": 22,
+        "lower": 18,
+        "upper": 26
+      },
+      {
+        "value": 22,
+        "lower": 18,
+        "upper": 26
+      }
+    ],
+    "formStatus": "neutral",
+    "formDelta": 0,
+    "trendStrength": 0.1,
+    "riskFlag": null,
+    "ceiling": 25,
+    "floor": 17,
+    "game_by_game": [],
+    "season_summary": {
+      "projected_era": 50.14,
+      "projected_k9": 4.3,
+      "projected_bb9": 25.7,
+      "win_probability_avg": 0.5,
+      "stuff_plus_projection": 70
+    }
+  },
+  {
+    "id": 16,
+    "name": "Morris, C.",
+    "hand": "RHP",
+    "role": "SP",
+    "metrics": {
+      "stuffPlus": 70,
+      "cswPct": 30.7,
+      "whiffPct": 31.2,
+      "kPct": 25.0,
+      "bbPct": 41.7,
+      "hardHitPct": 33.0,
+      "tunnelingScore": 50,
+      "seqScore": 50,
+      "avgVelo": 0,
+      "avgSpin": 0,
+      "ivb": 0,
+      "hBreak": 0,
+      "chasePct": 20,
+      "zonePct": 50,
+      "score": 9,
+      "stuffPlusRaw": 30
+    },
+    "pitchData": {
+      "pitches": [],
+      "types": []
+    },
+    "history": [
+      9,
+      9,
+      9,
+      9,
+      9,
+      9,
+      9,
+      9,
+      9,
+      9
+    ],
+    "predictions": [
+      9,
+      10,
+      10
+    ],
+    "rank": 17,
+    "predBands": [
+      {
+        "value": 9,
+        "lower": 5,
+        "upper": 13
+      },
+      {
+        "value": 10,
+        "lower": 6,
+        "upper": 14
+      },
+      {
+        "value": 10,
+        "lower": 6,
+        "upper": 14
+      }
+    ],
+    "formStatus": "neutral",
+    "formDelta": 0,
+    "trendStrength": 0.1,
+    "riskFlag": null,
+    "ceiling": 13,
+    "floor": 5,
+    "game_by_game": [],
+    "season_summary": {
+      "projected_era": 9.0,
+      "projected_k9": 13.5,
+      "projected_bb9": 22.5,
+      "win_probability_avg": 0.5,
+      "stuff_plus_projection": 70
+    }
+  }
+]

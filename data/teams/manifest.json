@@ -1,3 +1,50 @@
 [
-  { "name": "William & Mary", "slug": "william-mary" }
+  {
+    "name": "Campbell",
+    "slug": "campbell"
+  },
+  {
+    "name": "Charleston",
+    "slug": "charleston"
+  },
+  {
+    "name": "Elon",
+    "slug": "elon"
+  },
+  {
+    "name": "Hofstra",
+    "slug": "hofstra"
+  },
+  {
+    "name": "LSU",
+    "slug": "lsu"
+  },
+  {
+    "name": "Monmouth",
+    "slug": "monmouth"
+  },
+  {
+    "name": "NC A&T",
+    "slug": "nc-a-t"
+  },
+  {
+    "name": "Northeastern",
+    "slug": "northeastern"
+  },
+  {
+    "name": "Stony Brook",
+    "slug": "stony-brook"
+  },
+  {
+    "name": "Towson",
+    "slug": "towson"
+  },
+  {
+    "name": "UNCW",
+    "slug": "uncw"
+  },
+  {
+    "name": "William & Mary",
+    "slug": "william-mary"
+  }
 ]
