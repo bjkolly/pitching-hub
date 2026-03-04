@@ -679,14 +679,18 @@ app.post('/api/schools/import', async (req, res) => {
     if (fs.existsSync(manifestPath)) {
       try { manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')); } catch { manifest = []; }
     }
-    if (!manifest.find(t => t.slug === slug)) {
-      manifest.push({ name, slug });
+    const existing = manifest.find(t => t.slug === slug);
+    if (!existing) {
+      manifest.push({ name, slug, ncaa_id });
       manifest.sort((a, b) => a.name.localeCompare(b.name));
+      fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+    } else if (!existing.ncaa_id) {
+      existing.ncaa_id = ncaa_id;
       fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
     }
 
     send('done', {
-      success: true, slug, name,
+      success: true, slug, name, ncaa_id,
       pitcherCount: pitchers.length,
       pitchers,                              // full data for client-side caching
       message: `Successfully imported ${pitchers.length} pitchers for ${name}`,
@@ -697,6 +701,76 @@ app.post('/api/schools/import', async (req, res) => {
       success: false,
       error: err.message,
       message: `Import failed: ${err.message}`,
+    });
+  } finally {
+    _importInFlight = false;
+    res.end();
+  }
+
+  req.on('close', () => { _importInFlight = false; });
+});
+
+// POST /api/schools/update — re-scrape latest data for an existing team (SSE streaming)
+app.post('/api/schools/update', async (req, res) => {
+  if (_importInFlight) {
+    return res.status(409).json({ error: 'Import/update already in progress' });
+  }
+
+  const { ncaa_id, name, slug } = req.body || {};
+  if (!ncaa_id || !name || !slug) {
+    return res.status(400).json({ error: 'Missing ncaa_id, name, or slug' });
+  }
+
+  // SSE headers
+  res.writeHead(200, {
+    'Content-Type':      'text/event-stream',
+    'Cache-Control':     'no-cache',
+    'Connection':        'keep-alive',
+    'X-Accel-Buffering': 'no',
+  });
+
+  const send = (event, data) => {
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
+  _importInFlight = true;
+  send('status', { step: 'start', message: `Updating ${name}...` });
+
+  try {
+    // 1. Re-scrape + compute metrics
+    const entries = await importTeam(ncaa_id, name, (progress) => {
+      send('progress', progress);
+    });
+
+    // 2. Enrich via APPM
+    const { pitchers } = enrichPitchers(entries);
+    send('progress', { step: 'enrich', message: `APPM enrichment complete`, pct: 95 });
+
+    // 3. Overwrite team JSON (check both runtime + repo dirs)
+    const runtimeFile = path.join(RUNTIME_TEAMS_DIR, `${slug}.json`);
+    const repoFile = path.join(TEAMS_DIR, `${slug}.json`);
+
+    if (!IS_VERCEL && fs.existsSync(repoFile)) {
+      // Local: overwrite repo file directly
+      fs.writeFileSync(repoFile, JSON.stringify(pitchers, null, 2));
+    } else {
+      // Vercel: write to runtime dir (repo is read-only)
+      if (!fs.existsSync(RUNTIME_TEAMS_DIR)) fs.mkdirSync(RUNTIME_TEAMS_DIR, { recursive: true });
+      fs.writeFileSync(runtimeFile, JSON.stringify(pitchers, null, 2));
+    }
+
+    send('done', {
+      success: true, slug, name, ncaa_id,
+      pitcherCount: pitchers.length,
+      pitchers,
+      message: `Successfully updated ${pitchers.length} pitchers for ${name}`,
+    });
+  } catch (err) {
+    console.error('[update] Error:', err.message);
+    send('done', {
+      success: false,
+      error: err.message,
+      message: `Update failed: ${err.message}`,
     });
   } finally {
     _importInFlight = false;

@@ -1,50 +1,62 @@
 [
   {
     "name": "Campbell",
-    "slug": "campbell"
+    "slug": "campbell",
+    "ncaa_id": "20880"
   },
   {
     "name": "Charleston",
-    "slug": "charleston"
+    "slug": "charleston",
+    "ncaa_id": "21014"
   },
   {
     "name": "Elon",
-    "slug": "elon"
+    "slug": "elon",
+    "ncaa_id": "20537"
   },
   {
     "name": "Hofstra",
-    "slug": "hofstra"
+    "slug": "hofstra",
+    "ncaa_id": "20393"
   },
   {
     "name": "LSU",
-    "slug": "lsu"
+    "slug": "lsu",
+    "ncaa_id": "20004"
   },
   {
     "name": "Monmouth",
-    "slug": "monmouth"
+    "slug": "monmouth",
+    "ncaa_id": "22104"
   },
   {
     "name": "NC A&T",
-    "slug": "nc-a-t"
+    "slug": "nc-a-t",
+    "ncaa_id": "20412"
   },
   {
     "name": "Northeastern",
-    "slug": "northeastern"
+    "slug": "northeastern",
+    "ncaa_id": "20328"
   },
   {
     "name": "Stony Brook",
-    "slug": "stony-brook"
+    "slug": "stony-brook",
+    "ncaa_id": "20631"
   },
   {
     "name": "Towson",
-    "slug": "towson"
+    "slug": "towson",
+    "ncaa_id": "20435"
   },
   {
     "name": "UNCW",
-    "slug": "uncw"
+    "slug": "uncw",
+    "ncaa_id": "20652"
   },
   {
     "name": "William & Mary",
-    "slug": "william-mary"
+    "slug": "william-mary",
+    "ncaa_id": "20486"
   }
 ]

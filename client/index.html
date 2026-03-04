@@ -151,6 +151,19 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
 .ip-ai-label{padding:8px 18px;font-size:10px;color:#a476ff;font-weight:600;border-bottom:1px solid var(--border);}
 .h-btn-import{color:#a476ff;border-color:rgba(164,118,255,.3);}
 .h-btn-import:hover{color:#fff;border-color:#a476ff;background:rgba(164,118,255,.08);}
+.h-btn-update{color:#4caf50;border-color:rgba(76,175,80,.3);display:none;}
+.h-btn-update:hover{color:#fff;border-color:#4caf50;background:rgba(76,175,80,.12);}
+.h-btn-update.spin .update-icon{display:inline-block;animation:spin 1s linear infinite;}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+#updateOverlay{display:none;position:fixed;top:52px;left:0;right:0;bottom:0;background:rgba(0,0,0,.55);z-index:900;justify-content:center;align-items:center;}
+#updateOverlay.open{display:flex;}
+.update-modal{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:24px 28px;width:380px;max-height:70vh;overflow-y:auto;}
+.update-modal h3{margin:0 0 14px;font-size:14px;color:var(--text1);font-weight:600;}
+.update-log{font-family:'SF Mono',Menlo,monospace;font-size:11px;line-height:1.7;color:var(--text2);max-height:200px;overflow-y:auto;margin-bottom:14px;}
+.update-log .log-system{color:#4caf50;} .update-log .log-stderr{color:#f04e5e;}
+.update-bar-wrap{height:6px;background:var(--bg3);border-radius:3px;overflow:hidden;margin-bottom:8px;}
+.update-bar{height:100%;background:linear-gradient(90deg,#4caf50,#81c784);width:0%;transition:width .3s;}
+.update-pct{font-size:10px;color:var(--text3);text-align:right;}
 </style>
 </head>
 <body>
@@ -168,6 +181,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
     <button class="h-btn" id="liveBtn">⟳ Live Sync</button>
     <button class="h-btn h-btn-scout" id="scoutBtn">🔍 Run Scout Agents</button>
     <button class="h-btn h-btn-import" id="importBtn">📥 Import School</button>
+    <button class="h-btn h-btn-update" id="updateBtn"><span class="update-icon">🔄</span> Update</button>
     <span class="scout-badge" id="scoutBadge">SCOUT DATA</span>
     <select class="h-sel" id="sessionSel"></select>
     <button class="h-btn" id="resetBtn">Reset View</button>
@@ -275,6 +289,15 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
   <div class="sp-footer" id="ipFooter" style="display:none">
     <div class="sp-progress"><div class="sp-bar" id="ipBar"></div></div>
     <div class="sp-pct" id="ipPct">0%</div>
+  </div>
+</div>
+
+<div id="updateOverlay">
+  <div class="update-modal">
+    <h3 id="updateTitle">🔄 Updating Team...</h3>
+    <div class="update-log" id="updateLog"></div>
+    <div class="update-bar-wrap"><div class="update-bar" id="updateBar"></div></div>
+    <div class="update-pct" id="updatePct">0%</div>
   </div>
 </div>
 
@@ -1210,6 +1233,7 @@ function finishScout(success){
 
 // ════ TEAM SELECTOR ════
 let currentTeam='';  // tracks selected team slug
+const _teamMeta={};  // {slug: {name, ncaa_id}} for update button
 
 async function loadTeams(){
   try{
@@ -1219,7 +1243,17 @@ async function loadTeams(){
     const sel=document.getElementById('teamSel');
     sel.innerHTML=`<option value="">Select Team...</option>`+
       teams.map(t=>`<option value="${t.slug}">${t.name}</option>`).join('');
+    // Store metadata (ncaa_id) for each team
+    for(const t of teams){
+      _teamMeta[t.slug]={name:t.name,ncaa_id:t.ncaa_id||null};
+    }
   }catch(err){console.error('Failed to load teams:',err);}
+}
+
+function toggleUpdateBtn(){
+  const btn=document.getElementById('updateBtn');
+  const meta=_teamMeta[currentTeam];
+  btn.style.display=(currentTeam&&currentTeam!=='sample'&&meta&&meta.ncaa_id)?'':'none';
 }
 
 const _importCache={};  // client-side cache for freshly-imported teams
@@ -1249,6 +1283,7 @@ document.getElementById('teamSel').addEventListener('change',async e=>{
   const slug=e.target.value;
   if(!slug)return;
   currentTeam=slug;
+  toggleUpdateBtn();
   try{await loadTeamData(slug);}
   catch(err){console.error('Team load error:',err);}
 });
@@ -1401,6 +1436,11 @@ async function ipImport(ncaaId,name){
               }
               sel.value=parsed.slug;
               currentTeam=parsed.slug;
+              // Store metadata so Update button works for freshly imported teams
+              if(!_teamMeta[parsed.slug])_teamMeta[parsed.slug]={};
+              _teamMeta[parsed.slug].name=parsed.name;
+              _teamMeta[parsed.slug].ncaa_id=parsed.ncaa_id||null;
+              toggleUpdateBtn();
               loadTeamData(parsed.slug);
               setTimeout(()=>{ipResetUI();closeImportPanel();},2000);
             }else{
@@ -1434,6 +1474,123 @@ function ipResetUI(){
   document.getElementById('ipLog').style.display='none';
   document.getElementById('ipFooter').style.display='none';
   document.querySelector('.ip-search').style.display='';
+}
+
+// ════ UPDATE TEAM ════
+
+document.getElementById('updateBtn').addEventListener('click',updateTeam);
+
+async function updateTeam(){
+  const meta=_teamMeta[currentTeam];
+  if(!meta||!meta.ncaa_id)return;
+
+  const overlay=document.getElementById('updateOverlay');
+  const log=document.getElementById('updateLog');
+  const bar=document.getElementById('updateBar');
+  const pct=document.getElementById('updatePct');
+  const btn=document.getElementById('updateBtn');
+
+  // Open overlay + spin button icon
+  overlay.classList.add('open');
+  btn.classList.add('spin');
+  btn.disabled=true;
+  log.innerHTML='';
+  bar.style.width='0%';
+  pct.textContent='0%';
+  document.getElementById('updateTitle').textContent=`🔄 Updating ${meta.name}...`;
+
+  const addLog=(msg,cls='')=>{
+    const d=document.createElement('div');
+    if(cls)d.className=cls;
+    d.textContent=msg;
+    log.appendChild(d);
+    log.scrollTop=log.scrollHeight;
+  };
+
+  addLog(`Fetching latest data for ${meta.name}...`,'log-system');
+
+  try{
+    const response=await fetch('/api/schools/update',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      credentials:'include',
+      body:JSON.stringify({ncaa_id:meta.ncaa_id,name:meta.name,slug:currentTeam}),
+    });
+
+    if(!response.ok&&response.headers.get('content-type')?.includes('json')){
+      const err=await response.json();
+      addLog(`Error: ${err.error}`,'log-stderr');
+      setTimeout(()=>closeUpdateOverlay(btn),3000);
+      return;
+    }
+
+    const reader=response.body.getReader();
+    const decoder=new TextDecoder();
+    let buffer='';
+
+    function processEvents(text){
+      buffer+=text;
+      const parts=buffer.split('\n\n');
+      buffer=parts.pop()||'';
+      for(const part of parts){
+        if(!part.trim())continue;
+        let event='message',data='';
+        for(const line of part.split('\n')){
+          if(line.startsWith('event: '))event=line.slice(7);
+          else if(line.startsWith('data: '))data=line.slice(6);
+        }
+        if(!data)continue;
+        let parsed;
+        try{parsed=JSON.parse(data);}catch{continue;}
+        switch(event){
+          case'progress':
+            addLog(parsed.message);
+            bar.style.width=parsed.pct+'%';
+            pct.textContent=parsed.pct+'%';
+            break;
+          case'status':
+            addLog(parsed.message,'log-system');
+            break;
+          case'done':
+            if(parsed.success){
+              bar.style.width='100%';
+              pct.textContent='100%';
+              addLog(`✓ Updated ${parsed.pitcherCount} pitchers for ${parsed.name}`,'log-system');
+              // Cache fresh data + reload view
+              if(parsed.pitchers&&Array.isArray(parsed.pitchers)){
+                _importCache[parsed.slug]=parsed.pitchers;
+              }
+              loadTeamData(parsed.slug);
+              setTimeout(()=>closeUpdateOverlay(btn),2000);
+            }else{
+              addLog(`✗ Update failed: ${parsed.error}`,'log-stderr');
+              setTimeout(()=>closeUpdateOverlay(btn),3000);
+            }
+            break;
+        }
+      }
+    }
+
+    function pump(){
+      reader.read().then(({done,value})=>{
+        if(done){if(buffer.trim())processEvents('\n\n');return;}
+        processEvents(decoder.decode(value,{stream:true}));
+        pump();
+      }).catch(err=>{
+        addLog(`Stream error: ${err.message}`,'log-stderr');
+        closeUpdateOverlay(btn);
+      });
+    }
+    pump();
+  }catch(err){
+    addLog(`Connection error: ${err.message}`,'log-stderr');
+    setTimeout(()=>closeUpdateOverlay(btn),3000);
+  }
+}
+
+function closeUpdateOverlay(btn){
+  document.getElementById('updateOverlay').classList.remove('open');
+  if(btn){btn.classList.remove('spin');btn.disabled=false;}
 }
 
 // ════ INIT ════
