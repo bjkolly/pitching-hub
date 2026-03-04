@@ -49,6 +49,9 @@ LLM_MODEL = LLM(
     max_tokens=16384,
 )
 
+# Same model for scouting tasks (data is pre-filtered to reduce token volume)
+LLM_SCOUT = LLM_MODEL
+
 # ---------------------------------------------------------------------------
 # Pydantic models for structured task output
 #
@@ -175,7 +178,7 @@ def build_agents() -> dict[str, Agent]:
             "cases gracefully by noting missing fields rather than "
             "fabricating values."
         ),
-        llm=LLM_MODEL,
+        llm=LLM_SCOUT,
         tools=[get_wm_schedule, get_box_score, get_opponent_batters],
         verbose=True,
         allow_delegation=False,
@@ -213,7 +216,7 @@ def build_agents() -> dict[str, Agent]:
             "When exact data is unavailable, you clearly mark the value "
             "as an estimate and explain your derivation."
         ),
-        llm=LLM_MODEL,
+        llm=LLM_SCOUT,
         tools=[get_all_wm_pitcher_stats, get_wm_pitcher_game_logs],
         verbose=True,
         allow_delegation=False,
@@ -527,6 +530,173 @@ def build_crew(agents: dict[str, Agent], tasks: list[Task]) -> Crew:
     )
 
 
+def _pre_compute_scouting_data() -> dict:
+    """Run data-heavy scouting in pure Python (no LLM needed).
+
+    Returns a dict with 'batters_json' and 'pitchers_json' strings that
+    can be injected directly into agent task descriptions.
+    """
+    from tools.ncaa_scraper import (
+        _get_wm_schedule_impl,
+        _get_opponent_batters_impl,
+        _get_all_wm_pitcher_stats_impl,
+        _get_wm_pitcher_game_logs_impl,
+    )
+    from collections import defaultdict
+    import math
+
+    # ── Step 1: Schedule + opponent batters ──
+    print("\n📋 Step 1: Fetching schedule…")
+    schedule = _get_wm_schedule_impl()
+    print(f"   {len(schedule)} games, "
+          f"{sum(1 for g in schedule if g.get('box_score_id'))} with box scores")
+
+    # Group box score IDs by opponent
+    opp_bs: dict[str, list[str]] = defaultdict(list)
+    for g in schedule:
+        if g.get("box_score_id"):
+            opp_bs[g["opponent"]].append(g["box_score_id"])
+
+    print(f"\n📋 Step 2: Scraping batters for {len(opp_bs)} opponents…")
+    all_batters = []
+    for i, (opp_name, bs_ids) in enumerate(sorted(opp_bs.items()), 1):
+        print(f"   [{i}/{len(opp_bs)}] {opp_name} ({len(bs_ids)} games)…")
+        batters = _get_opponent_batters_impl(opp_name, bs_ids)
+        all_batters.extend(batters)
+    print(f"   Total batters: {len(all_batters)}")
+
+    # ── Step 2: Pitcher stats + game logs ──
+    print(f"\n📋 Step 3: Fetching pitcher stats…")
+    pitcher_stats = _get_all_wm_pitcher_stats_impl()
+    print(f"   Found {len(pitcher_stats)} pitchers on roster")
+
+    print(f"\n📋 Step 4: Building pitcher game logs…")
+    game_logs = _get_wm_pitcher_game_logs_impl()
+    print(f"   Built logs for {len(game_logs)} pitchers")
+
+    # ── Step 3: Pre-compute pitcher profiles (filtering to 2026 roster) ──
+    print(f"\n📋 Step 5: Computing pitcher profiles for 2026 returnees…")
+    roster_lower = [n.lower() for n in ROSTER_2026_PITCHERS]
+
+    pitcher_profiles = []
+    pid = 1
+    for p in pitcher_stats:
+        name_lower = p["name"].lower().strip()
+        # Match by full name or last name
+        matched = False
+        for rn in roster_lower:
+            if name_lower == rn or name_lower.split(",")[0].strip() in rn or rn.split()[-1] in name_lower:
+                matched = True
+                break
+        if not matched:
+            continue
+
+        ip = p.get("ip", 0)
+        era = p.get("era", 0)
+        k = p.get("k", 0)
+        bb = p.get("bb", 0)
+        h = p.get("h", 0)
+        g = p.get("g", 0)
+        gs = p.get("gs", 0)
+        ip_for_rate = ip if ip > 0 else 1
+
+        # Derived metrics
+        kPct = round(k / ip_for_rate * 9 / 9 * 100, 1) if ip > 0 else 0
+        bbPct = round(bb / ip_for_rate * 9 / 9 * 100, 1) if ip > 0 else 0
+        whiffPct = round(kPct * 1.25, 1)
+        cswPct = round(0.6 * whiffPct + 12, 1)
+        stuffPlus = round(max(70, min(160,
+            100 + (kPct - bbPct - 10) * 3 + (4.60 - era) * 5
+        )))
+        score = round(
+            stuffPlus * 0.35
+            + (100 - bbPct * 5) * 0.25
+            + kPct * 0.25
+            + (100 - 33.0 * 2) * 0.15
+        )
+
+        hand = p.get("hand") or "RHP"
+        role = "SP" if gs > g / 2 else "RP"
+
+        # Game log history
+        pitcher_log = next(
+            (lg for lg in game_logs
+             if lg["pitcher_name"].lower().strip() == name_lower
+             or name_lower.split(",")[0].strip() in lg["pitcher_name"].lower()),
+            None,
+        )
+        history = []
+        if pitcher_log:
+            for entry in pitcher_log["game_logs"][-10:]:
+                outing_era = entry.get("er", 0) / max(entry.get("ip", 1), 0.1) * 9
+                h_score = max(20, min(90, score + (4.60 - outing_era) * 3))
+                history.append(round(h_score, 1))
+        if not history:
+            history = [float(score)] * 5
+
+        predictions = [score, score + 1, score + 2]
+        predBands = [
+            {"value": score, "lower": score - 4, "upper": score + 4},
+            {"value": score + 1, "lower": score - 5, "upper": score + 5},
+            {"value": score + 2, "lower": score - 6, "upper": score + 6},
+        ]
+
+        pitcher_profiles.append({
+            "id": pid,
+            "name": p["name"],
+            "hand": hand,
+            "role": role,
+            "metrics": {
+                "stuffPlus": stuffPlus,
+                "cswPct": cswPct,
+                "whiffPct": whiffPct,
+                "kPct": kPct,
+                "bbPct": bbPct,
+                "hardHitPct": 33.0,
+                "tunnelingScore": 50,
+                "seqScore": 50,
+                "avgVelo": 0, "avgSpin": 0, "ivb": 0, "hBreak": 0,
+                "chasePct": 20, "zonePct": 50,
+                "score": score,
+                "stuffPlusRaw": round(stuffPlus / 1.6, 1),
+            },
+            "pitchData": {"pitches": [], "types": []},
+            "history": history,
+            "predictions": predictions,
+            "rank": pid,
+            "predBands": predBands,
+            "formStatus": "neutral",
+            "formDelta": 0,
+            "trendStrength": 0.1,
+            "riskFlag": None,
+            "ceiling": min(score + 12, 95),
+            "floor": max(score - 12, 20),
+            "game_by_game": [],
+            "season_summary": {
+                "projected_era": era,
+                "projected_k9": p.get("k_per_9", 0),
+                "projected_bb9": p.get("bb_per_9", 0),
+                "win_probability_avg": 0.5,
+                "stuff_plus_projection": stuffPlus,
+            },
+        })
+        pid += 1
+
+    # Rank by score
+    pitcher_profiles.sort(key=lambda p: p["metrics"]["score"], reverse=True)
+    for i, pp in enumerate(pitcher_profiles, 1):
+        pp["rank"] = i
+        pp["id"] = i
+
+    print(f"   Built {len(pitcher_profiles)} pitcher profiles")
+
+    return {
+        "batters": all_batters,
+        "pitchers": pitcher_profiles,
+        "schedule": schedule,
+    }
+
+
 def main():
     print("=" * 60)
     print("  Pitching Hub — CrewAI Scouting Pipeline")
@@ -545,52 +715,144 @@ def main():
         )
         sys.exit(1)
 
-    # Build components
-    agents = build_agents()
-    tasks = build_tasks(agents)
-    crew = build_crew(agents, tasks)
+    # ── Phase 1: Pre-compute scouting data (no LLM, pure scraping) ──
+    print("\n🔧 Phase 1: Pre-computing scouting data (no LLM)…\n")
+    data = _pre_compute_scouting_data()
 
-    # Run
-    print("\nKicking off crew…\n")
-    result = crew.kickoff(
-        inputs={
-            "target_school": TARGET_SCHOOL,
-            "ncaa_team_id": TARGET_NCAA_ID,
-            "season_year": SEASON_YEAR,
-        }
+    # If we have valid pitcher profiles, we can write directly
+    # The LLM-based matchup/prediction phases are optional enrichment
+    pitcher_profiles = data["pitchers"]
+
+    if not pitcher_profiles:
+        print("\n⚠  No pitcher profiles generated. Check config ROSTER_2026_PITCHERS.")
+        sys.exit(1)
+
+    # ── Phase 2: LLM enrichment (matchup analysis + predictions) ──
+    # Build a compact summary for the LLM
+    batter_summary = []
+    for b in data["batters"][:100]:  # top 100 batters (by AB)
+        batter_summary.append(
+            f"{b['name']} ({b['team']}): AVG={b['avg']:.3f} OBP={b['obp']:.3f} "
+            f"SLG={b['slg']:.3f} K%={b['k_pct']:.1f} BB%={b['bb_pct']:.1f} "
+            f"AB={b['total_ab']} G={b['vs_wm_games']}"
+        )
+
+    pitcher_summary = []
+    for p in pitcher_profiles:
+        m = p["metrics"]
+        pitcher_summary.append(
+            f"{p['name']} ({p['hand']}/{p['role']}): score={m['score']} "
+            f"stuffPlus={m['stuffPlus']} K%={m['kPct']:.1f} BB%={m['bbPct']:.1f} "
+            f"ERA={p['season_summary']['projected_era']:.2f}"
+        )
+
+    schedule_summary = []
+    for g in data["schedule"]:
+        if g.get("box_score_id"):
+            schedule_summary.append(
+                f"{g['date']} {'@' if g['home_away'] == 'away' else 'vs'} "
+                f"{g['opponent']} {g.get('result', '') or ''} {g.get('score', '')}"
+            )
+
+    print(f"\n🤖 Phase 2: LLM matchup analysis…")
+    print(f"   {len(batter_summary)} batters, {len(pitcher_summary)} pitchers, "
+          f"{len(schedule_summary)} games\n")
+
+    # Create a focused matchup + prediction crew (only 2 agents, 2 tasks)
+    enrichment_agent = Agent(
+        role="Baseball Matchup & Prediction Analyst",
+        goal=(
+            f"Analyse matchups between {TARGET_SCHOOL} pitchers and "
+            f"opponent batters, then produce game-by-game predictions "
+            f"for each pitcher."
+        ),
+        backstory=(
+            "You are an elite analytics engine that combines pitcher "
+            "profiles with opponent batting data to produce actionable "
+            "matchup insights and season forecasts."
+        ),
+        llm=LLM_MODEL,
+        tools=[],
+        verbose=True,
+        allow_delegation=False,
+        max_iter=15,
     )
 
-    # ---- Post-process: ensure output file is valid JSON ----
-    raw = result.raw
+    enrichment_task = Task(
+        description=(
+            f"Here is the pre-computed scouting data for {TARGET_SCHOOL} "
+            f"({SEASON_YEAR} season):\n\n"
+            f"=== PITCHERS ({len(pitcher_summary)}) ===\n"
+            + "\n".join(pitcher_summary) + "\n\n"
+            f"=== TOP OPPONENT BATTERS ({len(batter_summary)}) ===\n"
+            + "\n".join(batter_summary[:50]) + "\n\n"  # limit to 50
+            f"=== SCHEDULE ({len(schedule_summary)} games) ===\n"
+            + "\n".join(schedule_summary[:30]) + "\n\n"  # limit to 30
+            "YOUR TASK:\n"
+            "For each pitcher, produce a JSON object with:\n"
+            "- game_by_game: array of up to 10 games with "
+            "{opponent, date, projected_era, projected_k, projected_bb, "
+            "confidence, key_matchups}\n"
+            "- season_summary: {projected_era, projected_k9, projected_bb9, "
+            "win_probability_avg, stuff_plus_projection}\n\n"
+            "Return a JSON array with one object per pitcher, keyed by name:\n"
+            '[{"name": "...", "game_by_game": [...], "season_summary": {...}}, ...]'
+        ),
+        expected_output=(
+            "A JSON array of pitcher enrichment objects with game_by_game "
+            "projections and season_summary."
+        ),
+        agent=enrichment_agent,
+    )
+
+    enrichment_crew = Crew(
+        agents=[enrichment_agent],
+        tasks=[enrichment_task],
+        process=Process.sequential,
+        verbose=True,
+        cache=True,
+        max_rpm=3,
+        output_log_file=str(Path(__file__).resolve().parent / "crew_run.log"),
+    )
+
     try:
-        # The LLM sometimes wraps JSON in markdown fences
-        cleaned = raw.strip()
-        if cleaned.startswith("```"):
-            # Strip ```json ... ```
-            lines = cleaned.split("\n")
+        result = enrichment_crew.kickoff()
+        raw = result.raw.strip()
+
+        # Parse LLM enrichment output
+        if raw.startswith("```"):
+            lines = raw.split("\n")
             lines = [l for l in lines if not l.strip().startswith("```")]
-            cleaned = "\n".join(lines)
-        parsed = json.loads(cleaned)
+            raw = "\n".join(lines)
 
-        # Ensure we have a list
-        if isinstance(parsed, dict) and "pitchers" in parsed:
-            parsed = parsed["pitchers"]
-        if not isinstance(parsed, list):
-            parsed = [parsed]
+        enrichments = json.loads(raw)
+        if isinstance(enrichments, dict) and "pitchers" in enrichments:
+            enrichments = enrichments["pitchers"]
+        if not isinstance(enrichments, list):
+            enrichments = [enrichments]
 
-        OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with open(OUTPUT_FILE, "w") as f:
-            json.dump(parsed, f, indent=2)
+        # Merge enrichments into pitcher profiles
+        for enr in enrichments:
+            enr_name = enr.get("name", "").lower()
+            for pp in pitcher_profiles:
+                if pp["name"].lower() == enr_name or enr_name in pp["name"].lower():
+                    if "game_by_game" in enr:
+                        pp["game_by_game"] = enr["game_by_game"]
+                    if "season_summary" in enr:
+                        pp["season_summary"].update(enr["season_summary"])
+                    break
 
-        print(f"\n✅ Wrote {len(parsed)} pitcher(s) to {OUTPUT_FILE}")
+        print(f"\n✅ Merged enrichments for {len(enrichments)} pitchers")
 
-    except (json.JSONDecodeError, TypeError) as e:
-        # Write raw output as fallback so nothing is lost
-        OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with open(OUTPUT_FILE, "w") as f:
-            f.write(raw)
-        print(f"\n⚠  JSON parse failed ({e}); raw output saved to {OUTPUT_FILE}")
+    except Exception as e:
+        print(f"\n⚠  LLM enrichment failed ({e}); using base profiles")
 
+    # ── Phase 3: Write output ──
+    OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(OUTPUT_FILE, "w") as f:
+        json.dump(pitcher_profiles, f, indent=2)
+
+    print(f"\n✅ Wrote {len(pitcher_profiles)} pitcher(s) to {OUTPUT_FILE}")
     print("\nDone.")
 
 

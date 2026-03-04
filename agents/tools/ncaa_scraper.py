@@ -759,8 +759,16 @@ def _get_opponent_batters_impl(
             "vs_wm_games": a["vs_wm_games"],
         })
 
-    # Sort by AB descending (regulars first)
+    # Filter: drop batters with 0 AB (pitchers, unused subs)
+    batters = [b for b in batters if b["total_ab"] > 0]
+
+    # Clean position prefix from names (e.g. "rfSmith, J." → "Smith, J.")
+    for b in batters:
+        b["name"] = re.sub(r"^(?:ph/)?(?:dh|rf|lf|cf|ss|2b|3b|1b|c|p)\s*", "", b["name"])
+
+    # Sort by AB descending (regulars first), limit to top 12 per team
     batters.sort(key=lambda b: b["total_ab"], reverse=True)
+    batters = batters[:12]
     _write_cache(cache_file, batters)
     return batters
 
