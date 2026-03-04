@@ -687,7 +687,8 @@ app.post('/api/schools/import', async (req, res) => {
 
     send('done', {
       success: true, slug, name,
-      pitchers: pitchers.length,
+      pitcherCount: pitchers.length,
+      pitchers,                              // full data for client-side caching
       message: `Successfully imported ${pitchers.length} pitchers for ${name}`,
     });
   } catch (err) {

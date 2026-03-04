@@ -1222,7 +1222,18 @@ async function loadTeams(){
   }catch(err){console.error('Failed to load teams:',err);}
 }
 
+const _importCache={};  // client-side cache for freshly-imported teams
+
 async function loadTeamData(slug){
+  // Check client cache first (for newly imported teams on Vercel)
+  if(_importCache[slug]){
+    PS=_importCache[slug];
+    filters.hand.clear();filters.role.clear();filters.tier.clear();
+    document.querySelectorAll('.fg.on').forEach(b=>b.classList.remove('on'));
+    closeP();
+    updateKpi();resize();draw();
+    return;
+  }
   const url=slug&&slug!=='sample'?`/api/pitchers?team=${encodeURIComponent(slug)}`
     :slug==='sample'?'/api/pitchers?team=sample':'/api/pitchers';
   const res=await fetch(url);
@@ -1368,13 +1379,29 @@ async function ipImport(ncaaId,name){
             if(parsed.success){
               document.getElementById('ipBar').style.width='100%';
               document.getElementById('ipPct').textContent='100%';
-              addLog(`✓ Imported ${parsed.pitchers} pitchers for ${parsed.name}`,'log-system');
-              loadTeams().then(()=>{
-                const sel=document.getElementById('teamSel');
-                sel.value=parsed.slug;
-                currentTeam=parsed.slug;
-                loadTeamData(parsed.slug);
-              });
+              addLog(`✓ Imported ${parsed.pitcherCount||parsed.pitchers?.length||0} pitchers for ${parsed.name}`,'log-system');
+              // Cache pitcher data client-side (Vercel /tmp may not persist)
+              if(parsed.pitchers&&Array.isArray(parsed.pitchers)){
+                _importCache[parsed.slug]=parsed.pitchers;
+              }
+              // Add to dropdown without needing server persistence
+              const sel=document.getElementById('teamSel');
+              if(![...sel.options].some(o=>o.value===parsed.slug)){
+                const opt=document.createElement('option');
+                opt.value=parsed.slug;opt.textContent=parsed.name;
+                // Insert alphabetically
+                const opts=[...sel.options];
+                let inserted=false;
+                for(const o of opts){
+                  if(o.value!=='sample'&&o.value!==''&&o.textContent.localeCompare(parsed.name)>0){
+                    sel.insertBefore(opt,o);inserted=true;break;
+                  }
+                }
+                if(!inserted)sel.appendChild(opt);
+              }
+              sel.value=parsed.slug;
+              currentTeam=parsed.slug;
+              loadTeamData(parsed.slug);
               setTimeout(()=>{ipResetUI();closeImportPanel();},2000);
             }else{
               addLog(`✗ Import failed: ${parsed.error}`,'log-stderr');

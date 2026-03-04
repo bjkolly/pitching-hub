@@ -27,11 +27,22 @@ const HTTP_HEADERS = {
   'User-Agent':
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) ' +
     'AppleWebKit/537.36 (KHTML, like Gecko) ' +
-    'Chrome/125.0.0.0 Safari/537.36',
+    'Chrome/131.0.0.0 Safari/537.36',
   'Accept':
-    'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-  'Accept-Language': 'en-US,en;q=0.5',
+    'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+  'Accept-Language': 'en-US,en;q=0.9',
+  'Accept-Encoding': 'gzip, deflate, br',
   'Connection':      'keep-alive',
+  'Upgrade-Insecure-Requests': '1',
+  'Sec-Fetch-Dest':  'document',
+  'Sec-Fetch-Mode':  'navigate',
+  'Sec-Fetch-Site':  'none',
+  'Sec-Fetch-User':  '?1',
+  'Sec-Ch-Ua':       '"Chromium";v="131", "Not_A Brand";v="24"',
+  'Sec-Ch-Ua-Mobile': '?0',
+  'Sec-Ch-Ua-Platform': '"macOS"',
+  'Cache-Control':   'max-age=0',
+  'Referer':         'https://www.thebaseballcube.com/',
 };
 
 const SCHOOL_REGISTRY_PATH = path.join(__dirname, '../data/school_registry.json');
@@ -86,13 +97,69 @@ export async function scrapePitchers(ncaaId, teamName, onProgress = () => {}) {
   const url = `${BASE_URL}/${SEASON_YEAR}~${ncaaId}/`;
   onProgress({ step: 'fetch', message: `Fetching ${teamName} from Baseball Cube...`, pct: 10 });
 
-  const resp = await fetch(url, {
-    headers: HTTP_HEADERS,
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (!resp.ok) throw new Error(`HTTP ${resp.status} fetching ${teamName}`);
+  let html;
 
-  const html = await resp.text();
+  // Strategy 1: direct fetch (works locally, may 403 from cloud IPs)
+  try {
+    const resp = await fetch(url, {
+      headers: HTTP_HEADERS,
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (resp.ok) {
+      html = await resp.text();
+    } else if (resp.status === 403) {
+      // Cloud IP likely blocked — fall through to proxy strategies
+      console.log(`[scraper] Direct fetch 403 for ${teamName}, trying proxies...`);
+    } else {
+      throw new Error(`HTTP ${resp.status} fetching ${teamName}`);
+    }
+  } catch (err) {
+    if (html || (err.message && !err.message.includes('403') && !err.name?.includes('Abort'))) {
+      if (!html) throw err;
+    }
+  }
+
+  // Strategy 2: allorigins.win CORS proxy (verified working from cloud IPs)
+  if (!html) {
+    onProgress({ step: 'fetch', message: `Trying proxy for ${teamName}...`, pct: 12 });
+    try {
+      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+      const resp2 = await fetch(proxyUrl, {
+        headers: { 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(45_000),
+      });
+      if (resp2.ok) {
+        const json = await resp2.json();
+        if (json.contents && json.contents.length > 1000) {
+          html = json.contents;
+          console.log(`[scraper] allorigins proxy succeeded (${html.length} bytes)`);
+        }
+      } else {
+        console.log(`[scraper] allorigins proxy HTTP ${resp2.status}`);
+      }
+    } catch (err) {
+      console.log(`[scraper] allorigins proxy failed: ${err.message}`);
+    }
+  }
+
+  // Strategy 3: allorigins.win raw mode fallback
+  if (!html) {
+    try {
+      const proxyUrl2 = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+      const resp3 = await fetch(proxyUrl2, { signal: AbortSignal.timeout(45_000) });
+      if (resp3.ok) {
+        const text = await resp3.text();
+        if (text.length > 1000) {
+          html = text;
+          console.log(`[scraper] allorigins raw proxy succeeded (${html.length} bytes)`);
+        }
+      }
+    } catch (err) {
+      console.log(`[scraper] allorigins raw proxy failed: ${err.message}`);
+    }
+  }
+
+  if (!html) throw new Error(`Unable to fetch ${teamName} — site may be blocking cloud requests. Try running locally.`);
   const $ = cheerio.load(html);
 
   onProgress({ step: 'parse', message: 'Parsing pitching table...', pct: 25 });
