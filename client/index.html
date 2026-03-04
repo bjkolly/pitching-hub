@@ -1504,6 +1504,7 @@ document.getElementById('scoutBtn').addEventListener('click',()=>{
   runScoutAgents();
 });
 
+let _crewDataLoaded=false;
 async function loadCrewSession(){
   try{
     const res=await fetch('/api/crew-session');
@@ -1511,9 +1512,18 @@ async function loadCrewSession(){
     PS=await res.json();
     closeP();updateKpi();resize();
     showScoutBadge();
+    // Check if pipeline enrichment data exists (game_by_game)
+    _crewDataLoaded=Array.isArray(PS)&&PS.some(p=>p.game_by_game&&p.game_by_game.length>0);
+    if(_crewDataLoaded) markScoutAgentsDone();
   }catch(err){
     console.error('Failed to load crew session:',err);
   }
+}
+
+function markScoutAgentsDone(){
+  SCOUT_AGENTS.forEach(n=>setAgentState(n,'done'));
+  document.getElementById('spBar').style.width='100%';
+  document.getElementById('spPct').textContent='100%';
 }
 
 function runScoutAgents(){
@@ -1538,6 +1548,22 @@ function runScoutAgents(){
   // EventSource only supports GET).
   fetch('/api/run-agents',{method:'POST',credentials:'include'}).then(response=>{
     if(!response.ok){
+      if(response.status===422){
+        // Pipeline not available (Vercel / no Python env)
+        if(_crewDataLoaded){
+          markScoutAgentsDone();
+          const count=Array.isArray(PS)?PS.length:0;
+          appendLog('── Pre-loaded Pipeline Data ──','log-agent');
+          appendLog(`✓ ${count} pitcher profile(s) with game-by-game projections`,'log-system');
+          appendLog('ℹ Run locally (node server/index.js) to refresh data','log-system');
+          finishScout(true);
+        }else{
+          appendLog('Scout Agents requires a local server.','log-stderr');
+          appendLog('Run: node server/index.js','log-system');
+          finishScout(false);
+        }
+        return;
+      }
       appendLog(`Error: HTTP ${response.status}`,'log-stderr');
       finishScout(false);
       return;
