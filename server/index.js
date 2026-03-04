@@ -892,11 +892,16 @@ app.post('/api/schools/update', async (req, res) => {
 
 // GET /api/crew-session — serve crew_session.json for the hex UI
 app.get('/api/crew-session', (req, res) => {
-  if (!fs.existsSync(CREW_SESSION)) {
+  // Check /tmp first (Vercel runtime), then repo copy (deployed with build)
+  let filePath = null;
+  for (const p of [CREW_SESSION, CREW_SESSION_REPO]) {
+    if (fs.existsSync(p)) { filePath = p; break; }
+  }
+  if (!filePath) {
     return res.status(404).json({ error: 'No crew session data. Run scout agents first.' });
   }
   try {
-    const data = JSON.parse(fs.readFileSync(CREW_SESSION, 'utf8'));
+    const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: 'Failed to parse crew_session.json', details: err.message });
