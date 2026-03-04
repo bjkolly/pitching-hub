@@ -151,6 +151,11 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
 .ip-ai-label{padding:8px 18px;font-size:10px;color:#a476ff;font-weight:600;border-bottom:1px solid var(--border);}
 .h-btn-import{color:#a476ff;border-color:rgba(164,118,255,.3);}
 .h-btn-import:hover{color:#fff;border-color:#a476ff;background:rgba(164,118,255,.08);}
+.zoom-controls{display:flex;align-items:center;gap:4px;margin:0 2px;}
+.z-btn{background:transparent;border:1px solid var(--border2);color:var(--text2);width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;transition:all .15s;padding:0;line-height:1;}
+.z-btn:hover{color:#fff;border-color:var(--text2);background:rgba(255,255,255,.06);}
+.z-btn:active{transform:scale(.92);}
+.z-label{font-size:10px;color:var(--text3);min-width:32px;text-align:center;font-family:'SF Mono',Menlo,monospace;user-select:none;}
 .h-btn-update{color:#4caf50;border-color:rgba(76,175,80,.3);display:none;}
 .h-btn-update:hover{color:#fff;border-color:#4caf50;background:rgba(76,175,80,.12);}
 .h-btn-update.spin .update-icon{display:inline-block;animation:spin 1s linear infinite;}
@@ -184,6 +189,11 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
     <button class="h-btn h-btn-update" id="updateBtn"><span class="update-icon">🔄</span> Update</button>
     <span class="scout-badge" id="scoutBadge">SCOUT DATA</span>
     <select class="h-sel" id="sessionSel"></select>
+    <div class="zoom-controls">
+      <button class="z-btn" id="zoomOut" title="Zoom Out (−)">−</button>
+      <span class="z-label" id="zoomLabel">100%</span>
+      <button class="z-btn" id="zoomIn" title="Zoom In (+)">+</button>
+    </div>
     <button class="h-btn" id="resetBtn">Reset View</button>
     <button class="h-btn">Season 2025</button>
     <button class="h-btn" id="logoutBtn" style="color:#f04e5e;border-color:rgba(240,78,94,.3)">⏻ Sign Out</button>
@@ -325,6 +335,7 @@ const filters={hand:new Set(),role:new Set(),tier:new Set()};
 // ════ HEX LAYOUT ════
 const canvas=document.getElementById('mc'),ctx=canvas.getContext('2d');
 let W=0,H=0,stars=[],hovered=null,selected=null,nodes=[],anim=0;
+let zScale=1,zPanX=0,zPanY=0,zDragging=false,zDragStart=null;
 
 function hexPts(cx,cy,r){const p=[];for(let i=0;i<6;i++){const a=(Math.PI/180)*(60*i-30);p.push([cx+r*Math.cos(a),cy+r*Math.sin(a)]);}return p;}
 function hexPath(c,cx,cy,r){const p=hexPts(cx,cy,r);c.beginPath();p.forEach(([x,y],i)=>i?c.lineTo(x,y):c.moveTo(x,y));c.closePath();}
@@ -446,11 +457,37 @@ function drawNode(n){
 }
 
 function draw(){
-  anim++;ctx.clearRect(0,0,W,H);drawBg();drawStars();drawLines();
+  anim++;
+  ctx.clearRect(0,0,W,H);
+  drawBg();
+  // Apply zoom transform for world-space elements
+  ctx.save();
+  ctx.translate(W/2,H/2);
+  ctx.scale(zScale,zScale);
+  ctx.translate(-W/2+zPanX,-H/2+zPanY);
+  drawStars();drawLines();
   nodes.filter(n=>n.isSat).forEach(drawNode);
   nodes.filter(n=>n.p&&!n.isSat).forEach(drawNode);
   nodes.filter(n=>n.isC).forEach(drawNode);
+  ctx.restore();
+  // Draw zoom indicator HUD (outside transform)
+  if(zScale!==1){
+    ctx.save();
+    ctx.font='11px SF Mono, Menlo, monospace';
+    ctx.fillStyle='rgba(255,255,255,.4)';
+    ctx.textAlign='left';ctx.textBaseline='bottom';
+    ctx.fillText(Math.round(zScale*100)+'%',12,H-12);
+    ctx.restore();
+  }
   requestAnimationFrame(draw);
+}
+
+// Convert screen coords to world coords (accounting for zoom+pan)
+function screenToWorld(sx,sy){
+  return {
+    x:(sx-W/2)/zScale+W/2-zPanX,
+    y:(sy-H/2)/zScale+H/2-zPanY
+  };
 }
 
 // ════ FILTERS ════
@@ -477,16 +514,48 @@ document.querySelectorAll('.fg').forEach(btn=>{
   });
 });
 
+// ════ ZOOM ════
+function updateZoomBtns(){
+  document.getElementById('zoomLabel').textContent=Math.round(zScale*100)+'%';
+}
+function zoomTo(newScale){
+  zScale=clamp(newScale,0.5,3);
+  if(zScale===1){zPanX=0;zPanY=0;} // reset pan at 100%
+  updateZoomBtns();
+}
+document.getElementById('zoomIn').addEventListener('click',()=>zoomTo(zScale+0.15));
+document.getElementById('zoomOut').addEventListener('click',()=>zoomTo(zScale-0.15));
+// Keyboard shortcuts: + / - / 0
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT'||e.target.tagName==='TEXTAREA')return;
+  if(e.key==='='||e.key==='+')zoomTo(zScale+0.15);
+  else if(e.key==='-'||e.key==='_')zoomTo(zScale-0.15);
+  else if(e.key==='0'){zScale=1;zPanX=0;zPanY=0;updateZoomBtns();}
+});
+
 // ════ EVENTS ════
 canvas.addEventListener('mousemove',e=>{
-  const rect=canvas.getBoundingClientRect(),mx=e.clientX-rect.left,my=e.clientY-rect.top;
+  const rect=canvas.getBoundingClientRect();
+  const sx=e.clientX-rect.left,sy=e.clientY-rect.top;
+  // Handle pan dragging
+  if(zDragging&&zDragStart){
+    const dx=(e.clientX-zDragStart.x)/zScale;
+    const dy=(e.clientY-zDragStart.y)/zScale;
+    zPanX=zDragStart.panX+dx;
+    zPanY=zDragStart.panY+dy;
+    canvas.style.cursor='grabbing';
+    document.getElementById('tt').classList.remove('sh');
+    return;
+  }
+  // Transform screen coords → world coords for hit detection
+  const{x:mx,y:my}=screenToWorld(sx,sy);
   let found=null;
   for(let i=nodes.length-1;i>=0;i--){
     const n=nodes[i];
     if(n.isSat) continue;
     if(n.isC||n.p){ if(hexHit(n,mx,my)){found=n;break;} }
   }
-  hovered=found;canvas.style.cursor=found?'pointer':'default';
+  hovered=found;canvas.style.cursor=found?'pointer':(zScale>1?'grab':'default');
   if(found){
     const tt=document.getElementById('tt');
     if(found.isC){
@@ -515,12 +584,32 @@ canvas.addEventListener('mousemove',e=>{
     tt.style.left=tx+'px';tt.style.top=ty2+'px';tt.classList.add('sh');
   } else document.getElementById('tt').classList.remove('sh');
 });
+canvas.addEventListener('mousedown',e=>{
+  if(zScale>1&&!hovered){
+    zDragging=true;
+    zDragStart={x:e.clientX,y:e.clientY,panX:zPanX,panY:zPanY};
+    canvas.style.cursor='grabbing';
+    e.preventDefault();
+  }
+});
+canvas.addEventListener('mouseup',()=>{zDragging=false;zDragStart=null;});
 canvas.addEventListener('click',e=>{
+  if(zDragging)return;
   if(hovered){selected=hovered;if(hovered.isC)openTeamPanel();else openPanel(hovered.p);}
 });
-canvas.addEventListener('mouseleave',()=>{hovered=null;document.getElementById('tt').classList.remove('sh');});
+canvas.addEventListener('mouseleave',()=>{hovered=null;zDragging=false;zDragStart=null;document.getElementById('tt').classList.remove('sh');});
+// Mouse wheel zoom
+canvas.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const delta=e.deltaY>0?-0.1:0.1;
+  const newScale=clamp(zScale+delta,0.5,3);
+  if(newScale!==zScale){
+    zScale=newScale;
+    updateZoomBtns();
+  }
+},{passive:false});
 document.getElementById('rpClose').addEventListener('click',closeP);
-document.getElementById('resetBtn').addEventListener('click',()=>{selected=null;closeP();});
+document.getElementById('resetBtn').addEventListener('click',()=>{selected=null;closeP();zScale=1;zPanX=0;zPanY=0;updateZoomBtns();});
 
 function openPanel(p){
   ['rp','kpi','cw','fb'].forEach(id=>document.getElementById(id).classList.add(id==='rp'?'open':'po'));
