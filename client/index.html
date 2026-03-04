@@ -169,6 +169,43 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
 .update-bar-wrap{height:6px;background:var(--bg3);border-radius:3px;overflow:hidden;margin-bottom:8px;}
 .update-bar{height:100%;background:linear-gradient(90deg,#4caf50,#81c784);width:0%;transition:width .3s;}
 .update-pct{font-size:10px;color:var(--text3);text-align:right;}
+/* USER MENU DROPDOWN */
+.h-menu-wrap{position:relative;}
+.h-menu-btn{font-size:12px;color:var(--text2);background:transparent;border:1px solid var(--border2);padding:5px 14px;border-radius:6px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:6px;}
+.h-menu-btn:hover{color:#fff;border-color:rgba(255,255,255,.25);}
+.h-menu-btn .h-caret{font-size:8px;opacity:.5;transition:transform .2s;}
+.h-menu-wrap.open .h-caret{transform:rotate(180deg);}
+.h-menu{position:absolute;top:calc(100% + 6px);right:0;min-width:160px;background:var(--panel);border:1px solid var(--border2);border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.5);opacity:0;visibility:hidden;transform:translateY(-6px);transition:all .15s ease;z-index:200;}
+.h-menu-wrap.open .h-menu{opacity:1;visibility:visible;transform:translateY(0);}
+.h-menu-item{display:flex;align-items:center;gap:8px;padding:9px 14px;font-size:12px;color:var(--text2);cursor:pointer;transition:all .15s;border:none;background:none;width:100%;text-align:left;}
+.h-menu-item:first-child{border-radius:7px 7px 0 0;}
+.h-menu-item:last-child{border-radius:0 0 7px 7px;}
+.h-menu-item:hover{background:rgba(255,255,255,.06);color:#fff;}
+.h-menu-sep{height:1px;background:var(--border);margin:2px 0;}
+.h-menu-item.danger{color:#f04e5e;}
+.h-menu-item.danger:hover{background:rgba(240,78,94,.08);color:#ff6b7a;}
+.h-menu-item.hidden{display:none;}
+/* ADMIN PANEL */
+#adminPanel{position:fixed;top:52px;right:0;width:420px;height:calc(100% - 52px);background:var(--panel);border-left:1px solid var(--border2);z-index:120;transform:translateX(100%);transition:transform .35s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;}
+#adminPanel.open{transform:translateX(0);}
+.ap-form{padding:16px 18px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.ap-form-title{font-size:11px;font-weight:600;color:var(--orange);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;}
+.ap-row{display:flex;gap:8px;margin-bottom:8px;}
+.ap-input{flex:1;background:var(--bg2);border:1px solid var(--border2);color:var(--text);font-size:12px;padding:8px 12px;border-radius:6px;outline:none;font-family:inherit;}
+.ap-input:focus{border-color:var(--orange);}
+.ap-input::placeholder{color:var(--text3);}
+.ap-add-btn{background:rgba(232,135,10,.15);border:1px solid rgba(232,135,10,.3);color:var(--orange);font-size:11px;font-weight:600;padding:8px 16px;border-radius:6px;cursor:pointer;transition:all .2s;flex-shrink:0;}
+.ap-add-btn:hover{background:rgba(232,135,10,.25);}
+.ap-add-btn:disabled{opacity:.4;cursor:default;}
+.ap-list{flex:1;overflow-y:auto;padding:0;}
+.ap-user{display:flex;align-items:center;padding:10px 18px;gap:12px;border-bottom:1px solid var(--border);transition:background .15s;}
+.ap-user:hover{background:rgba(255,255,255,.03);}
+.ap-user-info{flex:1;min-width:0;}
+.ap-user-name{font-size:13px;font-weight:600;color:var(--text);}
+.ap-user-meta{font-size:10px;color:var(--text3);margin-top:1px;}
+.ap-remove-btn{font-size:10px;color:var(--red);border:1px solid rgba(240,78,94,.3);background:rgba(240,78,94,.08);padding:4px 10px;border-radius:4px;cursor:pointer;transition:all .15s;flex-shrink:0;}
+.ap-remove-btn:hover{background:rgba(240,78,94,.2);}
+.ap-msg{padding:40px 18px;text-align:center;color:var(--text3);font-size:11px;}
 </style>
 </head>
 <body>
@@ -196,7 +233,14 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
     </div>
     <button class="h-btn" id="resetBtn">Reset View</button>
     <button class="h-btn">Season 2025</button>
-    <button class="h-btn" id="logoutBtn" style="color:#f04e5e;border-color:rgba(240,78,94,.3)">⏻ Sign Out</button>
+    <div class="h-menu-wrap" id="userMenuWrap">
+      <button class="h-menu-btn" id="userMenuBtn"><span id="userMenuName">⏻</span> <span class="h-caret">▼</span></button>
+      <div class="h-menu">
+        <div class="h-menu-item hidden" id="adminMenuItem" onclick="openAdminPanel()">🛡 Admin</div>
+        <div class="h-menu-sep hidden" id="adminMenuSep"></div>
+        <div class="h-menu-item danger" id="logoutMenuItem">⏻ Sign Out</div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -311,6 +355,30 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
   </div>
 </div>
 
+<div id="adminPanel">
+  <div class="sp-hdr">
+    <div class="sp-title">🛡 User Management</div>
+    <button class="sp-close" id="apClose">✕</button>
+  </div>
+  <div class="ap-form">
+    <div class="ap-form-title">Add New User</div>
+    <div class="ap-row">
+      <input type="text" class="ap-input" id="apName" placeholder="Display name" autocomplete="off">
+    </div>
+    <div class="ap-row">
+      <input type="text" class="ap-input" id="apUsername" placeholder="Username" autocomplete="off">
+      <input type="password" class="ap-input" id="apPassword" placeholder="Password" autocomplete="off">
+    </div>
+    <div class="ap-row">
+      <button class="ap-add-btn" id="apAddBtn">+ Add User</button>
+    </div>
+    <div id="apFormMsg" style="font-size:11px;margin-top:4px;display:none"></div>
+  </div>
+  <div class="ap-list" id="apList">
+    <div class="ap-msg">Loading users...</div>
+  </div>
+</div>
+
 <script>
 // ════ UTILS ════
 const rand=(a,b)=>Math.random()*(b-a)+a;
@@ -338,7 +406,8 @@ let W=0,H=0,stars=[],hovered=null,selected=null,nodes=[],anim=0;
 let zScale=1,zPanX=0,zPanY=0,zDragging=false,zDragStart=null;
 
 // Group mode state
-let groupMode=null;       // null | 'hand' | 'tier'
+let groupMode=null;       // null | 'hand' | 'role' | 'tier'
+let groupModeVal=null;    // the specific value e.g. 'R', 'L', '0', 'SP'
 let expandedGroup=null;   // currently expanded group node
 let groupNodes=[];        // group hex nodes when in group mode
 let expandedNodes=[];     // pitcher nodes orbiting expanded group
@@ -379,7 +448,7 @@ function buildLayout(){
 
 function makeStars(){stars=[];for(let i=0;i<180;i++)stars.push({x:rand(0,W),y:rand(0,H),r:rand(.3,1.5),a:rand(.1,1),da:(rand(0,1)-.5)*.006});}
 
-function resize(){const cw=document.getElementById('cw');W=cw.clientWidth;H=cw.clientHeight;canvas.width=W;canvas.height=H;makeStars();if(groupMode)enterGroupMode(groupMode);else buildLayout();}
+function resize(){const cw=document.getElementById('cw');W=cw.clientWidth;H=cw.clientHeight;canvas.width=W;canvas.height=H;makeStars();if(groupMode)enterGroupMode(groupMode,groupModeVal);else buildLayout();}
 
 // ════ DRAW ════
 function drawBg(){
@@ -494,26 +563,16 @@ function drawGroupNode(n){
 }
 
 function drawGroupLines(){
-  const cn=nodes.find(n=>n.isC);if(!cn)return;
-  // Lines from center to group nodes
-  groupNodes.forEach(gn=>{
-    const c=TC[gn.tierIdx]||TC[2];
-    const isExp=expandedGroup===gn;
-    ctx.beginPath();ctx.moveTo(cn.cx,cn.cy);ctx.lineTo(gn.cx,gn.cy);
-    if(!isExp)ctx.setLineDash([4,8]);
-    ctx.strokeStyle=hexA2(c.g,isExp?.18:.08);ctx.lineWidth=isExp?1.5:.8;ctx.stroke();ctx.setLineDash([]);
+  // Lines from single center group to its orbiting pitchers
+  if(!groupNodes.length)return;
+  const gn=groupNodes[0];
+  expandedNodes.forEach(en=>{
+    const pc=TC[ti(en.p.metrics.score)];
+    const isH2=hovered===en,isS2=selected===en;
+    ctx.beginPath();ctx.moveTo(gn.cx,gn.cy);ctx.lineTo(en.cx,en.cy);
+    if(!(isH2||isS2))ctx.setLineDash([4,8]);
+    ctx.strokeStyle=hexA2(pc.g,isH2||isS2?.22:.08);ctx.lineWidth=isH2||isS2?1.5:.7;ctx.stroke();ctx.setLineDash([]);
   });
-  // Lines from expanded group to its pitchers
-  if(expandedGroup){
-    const c=TC[expandedGroup.tierIdx]||TC[2];
-    expandedNodes.forEach(en=>{
-      const pc=TC[ti(en.p.metrics.score)];
-      const isH2=hovered===en,isS2=selected===en;
-      ctx.beginPath();ctx.moveTo(expandedGroup.cx,expandedGroup.cy);ctx.lineTo(en.cx,en.cy);
-      if(!(isH2||isS2))ctx.setLineDash([4,8]);
-      ctx.strokeStyle=hexA2(pc.g,isH2||isS2?.22:.08);ctx.lineWidth=isH2||isS2?1.5:.7;ctx.stroke();ctx.setLineDash([]);
-    });
-  }
 }
 
 function draw(){
@@ -531,7 +590,6 @@ function draw(){
     expandedSats.forEach(drawNode);
     expandedNodes.forEach(drawNode);
     groupNodes.forEach(drawGroupNode);
-    nodes.filter(n=>n.isC).forEach(drawNode);
   } else {
     drawLines();
     nodes.filter(n=>n.isSat).forEach(drawNode);
@@ -574,8 +632,9 @@ function applyFilters(){
   if(disp.length>0)updateKpi(disp);
 }
 // ════ GROUP MODE ════
-function enterGroupMode(type){
+function enterGroupMode(type,val){
   groupMode=type;
+  groupModeVal=val;
   expandedGroup=null;
   expandedNodes=[];
   expandedSats=[];
@@ -584,84 +643,52 @@ function enterGroupMode(type){
   zScale=1;zPanX=0;zPanY=0;updateZoomBtns();
 
   const cx=W/2,cy=H/2;
-  let groups;
-  if(type==='hand'){
-    groups=[{val:'R',label:'RHP'},{val:'L',label:'LHP'}];
-  } else {
-    groups=[{val:'0',label:'Elite'},{val:'1',label:'Above Avg'},{val:'2',label:'Average'},{val:'3',label:'Below Avg'}];
-  }
 
-  // Collect pitchers per group
-  const populated=groups.map(g=>{
-    const pitchers=PS.filter(p=>{
-      if(type==='hand') return p.hand[0]===g.val;
-      return String(ti(p.metrics.score))===g.val;
-    });
-    return {...g, pitchers};
-  }).filter(g=>g.pitchers.length>0);
+  // Label map
+  const labelMap={hand:{R:'RHP',L:'LHP'},role:{SP:'SP',RP:'RP'},tier:{'0':'Elite','1':'Above Avg','2':'Average','3':'Below Avg'}};
+  const label=(labelMap[type]&&labelMap[type][val])||val;
 
-  // Position groups in circle around center
-  const rad=200;
-  populated.forEach((g,i)=>{
-    const a=(Math.PI*2/populated.length)*i-Math.PI/2;
-    const avgScore=Math.round(g.pitchers.reduce((a2,p)=>a2+p.metrics.score,0)/g.pitchers.length);
-    const tierIdx=type==='tier'?parseInt(g.val):ti(avgScore);
-    groupNodes.push({
-      cx:cx+rad*Math.cos(a),
-      cy:cy+rad*Math.sin(a),
-      r:70,
-      isGroup:true,
-      groupType:type,
-      groupVal:g.val,
-      label:g.label,
-      pitchers:g.pitchers,
-      count:g.pitchers.length,
-      avgScore,
-      tierIdx,
-    });
+  // Filter pitchers matching this specific group
+  const pitchers=PS.filter(p=>{
+    if(type==='hand') return p.hand[0]===val;
+    if(type==='role') return val==='SP'?p.role.includes('SP'):!p.role.includes('SP');
+    return String(ti(p.metrics.score))===val;
   });
-}
+  if(!pitchers.length){exitGroupMode();return;}
 
-function expandGroup(gNode){
-  if(expandedGroup===gNode){
-    // Collapse — re-center on the group layout
-    expandedGroup=null;
-    expandedNodes=[];
-    expandedSats=[];
-    zPanX=0;zPanY=0;zScale=1;updateZoomBtns();
-    return;
-  }
+  const avgScore=Math.round(pitchers.reduce((a2,p)=>a2+p.metrics.score,0)/pitchers.length);
+  const tierIdx=type==='tier'?parseInt(val):ti(avgScore);
+
+  // Create single group node at center
+  const gNode={cx,cy,r:70,isGroup:true,groupType:type,groupVal:val,label,pitchers,count:pitchers.length,avgScore,tierIdx};
+  groupNodes.push(gNode);
   expandedGroup=gNode;
-  expandedNodes=[];
-  expandedSats=[];
-  const ps=gNode.pitchers;
-  // Position pitchers in rings around the group node
+
+  // Immediately expand pitchers in orbital rings around center
+  const ps=pitchers;
   const ring1=Math.min(ps.length,6);
-  const ring2=ps.length-ring1;
-  const r1=160,r2=260;
-  ps.forEach((p,i)=>{
-    let rad2,count2,idx;
-    if(i<ring1){rad2=r1;count2=ring1;idx=i;}
-    else{rad2=r2;count2=ring2;idx=i-ring1;}
-    const a=(Math.PI*2/count2)*idx-Math.PI/2;
-    const n={cx:gNode.cx+rad2*Math.cos(a),cy:gNode.cy+rad2*Math.sin(a),r:ss(p.metrics.score),p};
-    expandedNodes.push(n);
-    // Add satellites
-    const t=ti(p.metrics.score);
-    for(let s=0;s<2;s++){
-      const sd=n.r*1.9+rand(0,22),sa=rand(0,Math.PI*2);
-      expandedSats.push({cx:n.cx+sd*Math.cos(sa),cy:n.cy+sd*Math.sin(sa),r:n.r*0.32+rand(0,6),p:null,isSat:true,t,op:.2+rand(0,.2)});
+  const ring2=Math.min(ps.length-ring1,10);
+  const ring3=ps.length-ring1-ring2;
+  const rings=[{start:0,count:ring1,rad:160},{start:ring1,count:ring2,rad:270},{start:ring1+ring2,count:ring3,rad:375}];
+  rings.forEach(({start,count:cnt,rad})=>{
+    if(cnt<=0)return;
+    for(let i=0;i<cnt;i++){
+      const p=ps[start+i];
+      const a=(Math.PI*2/cnt)*i-Math.PI/2;
+      const n={cx:cx+rad*Math.cos(a),cy:cy+rad*Math.sin(a),r:ss(p.metrics.score),p};
+      expandedNodes.push(n);
+      const t=ti(p.metrics.score);
+      for(let s=0;s<2;s++){
+        const sd=n.r*1.9+rand(0,22),sa=rand(0,Math.PI*2);
+        expandedSats.push({cx:n.cx+sd*Math.cos(sa),cy:n.cy+sd*Math.sin(sa),r:n.r*0.32+rand(0,6),p:null,isSat:true,t,op:.2+rand(0,.2)});
+      }
     }
   });
-  // Auto-center view on the expanded group node
-  zPanX=W/2-gNode.cx;
-  zPanY=H/2-gNode.cy;
-  zScale=1;
-  updateZoomBtns();
 }
 
 function exitGroupMode(){
   groupMode=null;
+  groupModeVal=null;
   expandedGroup=null;
   groupNodes=[];
   expandedNodes=[];
@@ -672,29 +699,20 @@ function exitGroupMode(){
   buildLayout();
 }
 
-// Filter buttons — Hand/Tier enter group mode, Role stays as dim/highlight filter
+// Filter buttons — ALL buttons enter single-group mode
 document.querySelectorAll('.fg').forEach(btn=>{
   btn.addEventListener('click',()=>{
     const{group,val}=btn.dataset;
-    if(group==='hand'||group==='tier'){
-      // Toggle group mode
-      if(groupMode===group){
-        exitGroupMode();
-      } else {
-        // Clear all button states first
-        document.querySelectorAll('.fg.on').forEach(b=>b.classList.remove('on'));
-        filters.hand.clear();filters.role.clear();filters.tier.clear();
-        btn.classList.add('on');
-        enterGroupMode(group);
-      }
-    } else {
-      // Role: keep existing dim/highlight behavior
-      if(groupMode) exitGroupMode();
-      const s=filters[group];
-      if(s.has(val)){s.delete(val);btn.classList.remove('on');}
-      else{s.add(val);btn.classList.add('on');}
-      applyFilters();
+    // If same button is already active, toggle off
+    if(groupMode===group&&groupModeVal===val){
+      exitGroupMode();
+      return;
     }
+    // Clear all button states, enter group mode for this specific selection
+    document.querySelectorAll('.fg.on').forEach(b=>b.classList.remove('on'));
+    filters.hand.clear();filters.role.clear();filters.tier.clear();
+    btn.classList.add('on');
+    enterGroupMode(group,val);
   });
 });
 
@@ -739,16 +757,11 @@ canvas.addEventListener('mousemove',e=>{
     for(let i=expandedNodes.length-1;i>=0;i--){
       if(hexHit(expandedNodes[i],mx,my)){found=expandedNodes[i];break;}
     }
-    // Check group nodes
+    // Check group node at center
     if(!found){
       for(let i=groupNodes.length-1;i>=0;i--){
         if(hexHit(groupNodes[i],mx,my)){found=groupNodes[i];break;}
       }
-    }
-    // Check center node
-    if(!found){
-      const cn=nodes.find(n=>n.isC);
-      if(cn&&hexHit(cn,mx,my))found=cn;
     }
   } else {
     for(let i=nodes.length-1;i>=0;i--){
@@ -818,7 +831,7 @@ canvas.addEventListener('click',e=>{
   if(zDidDrag){zDidDrag=false;return;}
   if(!hovered)return;
   if(hovered.isGroup){
-    expandGroup(hovered);
+    // Group node at center — no-op (already expanded)
   } else if(hovered.isC){
     selected=hovered;openTeamPanel();
   } else if(hovered.p){
@@ -1345,11 +1358,100 @@ document.getElementById('sessionSel').addEventListener('change',async e=>{
   sel.disabled=false;sel.value='';
 });
 
-// Logout
-document.getElementById('logoutBtn').addEventListener('click',async()=>{
+// ════ USER MENU DROPDOWN ════
+let _isAdmin=false;
+const userMenuWrap=document.getElementById('userMenuWrap');
+const userMenuBtn=document.getElementById('userMenuBtn');
+
+userMenuBtn.addEventListener('click',()=>{userMenuWrap.classList.toggle('open');});
+document.addEventListener('click',e=>{if(!userMenuWrap.contains(e.target))userMenuWrap.classList.remove('open');});
+
+document.getElementById('logoutMenuItem').addEventListener('click',async()=>{
   await fetch('/logout',{method:'POST',credentials:'include'});
   window.location.replace('/login');
 });
+
+async function loadUserInfo(){
+  try{
+    const res=await fetch('/api/me',{credentials:'include'});
+    if(!res.ok)return;
+    const data=await res.json();
+    document.getElementById('userMenuName').textContent=data.user||'⏻';
+    _isAdmin=!!data.isAdmin;
+    if(_isAdmin){
+      document.getElementById('adminMenuItem').classList.remove('hidden');
+      document.getElementById('adminMenuSep').classList.remove('hidden');
+    }
+  }catch(e){console.error('loadUserInfo:',e);}
+}
+loadUserInfo();
+
+// ════ ADMIN PANEL ════
+function openAdminPanel(){
+  userMenuWrap.classList.remove('open');
+  document.getElementById('adminPanel').classList.add('open');
+  loadAdminUsers();
+}
+function closeAdminPanel(){document.getElementById('adminPanel').classList.remove('open');}
+document.getElementById('apClose').addEventListener('click',closeAdminPanel);
+
+async function loadAdminUsers(){
+  const list=document.getElementById('apList');
+  list.innerHTML='<div class="ap-msg">Loading...</div>';
+  try{
+    const res=await fetch('/api/admin/users',{credentials:'include'});
+    if(!res.ok){list.innerHTML='<div class="ap-msg" style="color:var(--red)">Failed to load users</div>';return;}
+    const users=await res.json();
+    if(!users.length){list.innerHTML='<div class="ap-msg">No additional users. Add one above.</div>';return;}
+    list.innerHTML=users.map(u=>`
+      <div class="ap-user">
+        <div class="ap-user-info">
+          <div class="ap-user-name">${esc(u.name||u.username)}</div>
+          <div class="ap-user-meta">@${esc(u.username)}</div>
+        </div>
+        <button class="ap-remove-btn" data-username="${esc(u.username)}">Remove</button>
+      </div>`).join('');
+    list.querySelectorAll('.ap-remove-btn').forEach(btn=>{
+      btn.addEventListener('click',()=>removeUser(btn.dataset.username));
+    });
+  }catch(e){list.innerHTML='<div class="ap-msg" style="color:var(--red)">Error: '+e.message+'</div>';}
+}
+
+document.getElementById('apAddBtn').addEventListener('click',async()=>{
+  const name=document.getElementById('apName').value.trim();
+  const username=document.getElementById('apUsername').value.trim();
+  const password=document.getElementById('apPassword').value;
+  const msg=document.getElementById('apFormMsg');
+  if(!username||!password){showFormMsg('Username and password required','var(--red)');return;}
+  const btn=document.getElementById('apAddBtn');
+  btn.disabled=true;btn.textContent='Adding...';
+  try{
+    const res=await fetch('/api/admin/users',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({name,username,password})});
+    const data=await res.json();
+    if(!res.ok){showFormMsg(data.error||'Failed','var(--red)');return;}
+    showFormMsg('User added','var(--green)');
+    document.getElementById('apName').value='';
+    document.getElementById('apUsername').value='';
+    document.getElementById('apPassword').value='';
+    loadAdminUsers();
+  }catch(e){showFormMsg('Error: '+e.message,'var(--red)');}
+  finally{btn.disabled=false;btn.textContent='+ Add User';}
+});
+
+async function removeUser(username){
+  if(!confirm(`Remove user "${username}"?`))return;
+  try{
+    const res=await fetch(`/api/admin/users/${encodeURIComponent(username)}`,{method:'DELETE',credentials:'include'});
+    if(!res.ok){const d=await res.json();alert(d.error||'Failed');return;}
+    loadAdminUsers();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+function showFormMsg(text,color){
+  const msg=document.getElementById('apFormMsg');
+  msg.textContent=text;msg.style.color=color;msg.style.display='block';
+  setTimeout(()=>{msg.style.display='none';},3000);
+}
 
 // ════ SCOUT AGENTS ════
 const SCOUT_AGENTS=['Opponent Batter Scout','Target Pitcher Scout','Matchup Aligner','Season Predictor'];
@@ -1577,7 +1679,7 @@ const _importCache={};  // client-side cache for freshly-imported teams
 
 async function loadTeamData(slug){
   // Exit group mode if active
-  if(groupMode){groupMode=null;expandedGroup=null;groupNodes=[];expandedNodes=[];expandedSats=[];}
+  if(groupMode){groupMode=null;groupModeVal=null;expandedGroup=null;groupNodes=[];expandedNodes=[];expandedSats=[];}
   // Check client cache first (for newly imported teams on Vercel)
   if(_importCache[slug]){
     PS=_importCache[slug];

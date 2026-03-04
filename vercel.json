@@ -6,7 +6,7 @@
       "use": "@vercel/node",
       "config": {
         "maxDuration": 60,
-        "includeFiles": ["data/crew_session.json", "data/teams/**", "data/school_registry.json", "client/**"]
+        "includeFiles": ["data/crew_session.json", "data/teams/**", "data/school_registry.json", "data/users.json", "client/**"]
       }
     }
   ],

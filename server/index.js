@@ -50,6 +50,30 @@ const ADMIN_PASS      = process.env.ADMIN_PASS   || 'admin';
 // Hash password once at startup (~100 ms) — avoids storing plaintext hash in env
 const ADMIN_PASS_HASH = bcrypt.hashSync(ADMIN_PASS, 10);
 
+// ── User store (multi-user support) ──────────────────────────────────────────
+const USERS_FILE    = path.join(__dirname, '../data/users.json');
+const RUNTIME_USERS = IS_VERCEL ? path.join(DATA_DIR, 'users.json') : USERS_FILE;
+
+function readUsers() {
+  const files = RUNTIME_USERS !== USERS_FILE
+    ? [RUNTIME_USERS, USERS_FILE]
+    : [USERS_FILE];
+  for (const f of files) {
+    if (fs.existsSync(f)) {
+      try { return JSON.parse(fs.readFileSync(f, 'utf8')); }
+      catch { /* continue */ }
+    }
+  }
+  return [];
+}
+
+function writeUsers(users) {
+  fs.writeFileSync(RUNTIME_USERS, JSON.stringify(users, null, 2));
+  if (!IS_VERCEL && RUNTIME_USERS !== USERS_FILE) {
+    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+  }
+}
+
 // ── Middleware ─────────────────────────────────────────────────────────────────
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
@@ -196,6 +220,13 @@ function requireAuth(req, res, next) {
   }
 }
 
+function requireAdmin(req, res, next) {
+  if (!req.user?.isAdmin) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  next();
+}
+
 // ── Public routes (no auth required) ──────────────────────────────────────────
 
 // Health check
@@ -219,13 +250,33 @@ app.get('/login', (req, res) => {
   res.sendFile(path.join(CLIENT_DIR, 'login.html'));
 });
 
-// Login submit
+// Login submit (checks env-var admin first, then users.json)
 app.post('/login', async (req, res) => {
   const { username = '', password = '' } = req.body || {};
-  if (username !== ADMIN_USER || !bcrypt.compareSync(password, ADMIN_PASS_HASH)) {
+  let isAdmin = false;
+  let valid = false;
+
+  // Check env-var admin
+  if (username === ADMIN_USER && bcrypt.compareSync(password, ADMIN_PASS_HASH)) {
+    valid = true;
+    isAdmin = true;
+  }
+
+  // Check users.json
+  if (!valid) {
+    const users = readUsers();
+    const user = users.find(u => u.username === username);
+    if (user && bcrypt.compareSync(password, user.passwordHash)) {
+      valid = true;
+      isAdmin = false;
+    }
+  }
+
+  if (!valid) {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
-  const token = jwt.sign({ user: username }, JWT_SECRET, { expiresIn: '7d' });
+
+  const token = jwt.sign({ user: username, isAdmin }, JWT_SECRET, { expiresIn: '7d' });
   res.cookie('auth_token', token, {
     httpOnly: true,
     secure:   IS_VERCEL || process.env.NODE_ENV === 'production',
@@ -248,6 +299,56 @@ app.get('/', requireAuth, (_req, res) => {
 
 // ── Protected: all /api/* routes ─────────────────────────────────────────────
 app.use('/api', requireAuth);
+
+// Current user info
+app.get('/api/me', (req, res) => {
+  res.json({ user: req.user.user, isAdmin: !!req.user.isAdmin });
+});
+
+// ── Admin: User Management ──────────────────────────────────────────────────
+app.get('/api/admin/users', requireAdmin, (_req, res) => {
+  const users = readUsers().map(u => ({
+    name: u.name, username: u.username, createdAt: u.createdAt,
+  }));
+  res.json(users);
+});
+
+app.post('/api/admin/users', requireAdmin, (req, res) => {
+  const { name, username, password } = req.body || {};
+  if (!name || !username || !password) {
+    return res.status(400).json({ error: 'name, username, and password are required' });
+  }
+  if (username.length < 3 || username.length > 30) {
+    return res.status(400).json({ error: 'Username must be 3-30 characters' });
+  }
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  }
+  if (username === ADMIN_USER) {
+    return res.status(409).json({ error: 'Cannot create user with admin username' });
+  }
+  const users = readUsers();
+  if (users.find(u => u.username === username)) {
+    return res.status(409).json({ error: 'Username already exists' });
+  }
+  const passwordHash = bcrypt.hashSync(password, 10);
+  users.push({ name, username, passwordHash, createdAt: new Date().toISOString() });
+  writeUsers(users);
+  res.json({ ok: true, username });
+});
+
+app.delete('/api/admin/users/:username', requireAdmin, (req, res) => {
+  const { username } = req.params;
+  if (username === ADMIN_USER) {
+    return res.status(400).json({ error: 'Cannot delete the admin user' });
+  }
+  const users = readUsers();
+  const idx = users.findIndex(u => u.username === username);
+  if (idx === -1) return res.status(404).json({ error: 'User not found' });
+  users.splice(idx, 1);
+  writeUsers(users);
+  res.json({ ok: true });
+});
 
 // ── Helper: read team manifest (merges repo + runtime dirs for Vercel) ───────
 function readTeamManifest() {
