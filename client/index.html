@@ -337,6 +337,13 @@ const canvas=document.getElementById('mc'),ctx=canvas.getContext('2d');
 let W=0,H=0,stars=[],hovered=null,selected=null,nodes=[],anim=0;
 let zScale=1,zPanX=0,zPanY=0,zDragging=false,zDragStart=null;
 
+// Group mode state
+let groupMode=null;       // null | 'hand' | 'tier'
+let expandedGroup=null;   // currently expanded group node
+let groupNodes=[];        // group hex nodes when in group mode
+let expandedNodes=[];     // pitcher nodes orbiting expanded group
+let expandedSats=[];      // satellite decorations around expanded pitchers
+
 function hexPts(cx,cy,r){const p=[];for(let i=0;i<6;i++){const a=(Math.PI/180)*(60*i-30);p.push([cx+r*Math.cos(a),cy+r*Math.sin(a)]);}return p;}
 function hexPath(c,cx,cy,r){const p=hexPts(cx,cy,r);c.beginPath();p.forEach(([x,y],i)=>i?c.lineTo(x,y):c.moveTo(x,y));c.closePath();}
 function hexHit(n,mx,my){const p=hexPts(n.cx,n.cy,n.r);let inside=false;for(let i=0,j=p.length-1;i<p.length;j=i++){const[xi,yi]=p[i],[xj,yj]=p[j];if((yi>my)!==(yj>my)&&mx<(xj-xi)*(my-yi)/(yj-yi)+xi)inside=!inside;}return inside;}
@@ -372,7 +379,7 @@ function buildLayout(){
 
 function makeStars(){stars=[];for(let i=0;i<180;i++)stars.push({x:rand(0,W),y:rand(0,H),r:rand(.3,1.5),a:rand(.1,1),da:(rand(0,1)-.5)*.006});}
 
-function resize(){const cw=document.getElementById('cw');W=cw.clientWidth;H=cw.clientHeight;canvas.width=W;canvas.height=H;makeStars();buildLayout();}
+function resize(){const cw=document.getElementById('cw');W=cw.clientWidth;H=cw.clientHeight;canvas.width=W;canvas.height=H;makeStars();if(groupMode)enterGroupMode(groupMode);else buildLayout();}
 
 // ════ DRAW ════
 function drawBg(){
@@ -456,6 +463,59 @@ function drawNode(n){
   ctx.restore();
 }
 
+function drawGroupNode(n){
+  ctx.save();
+  const{cx,cy,r}=n;
+  const c=TC[n.tierIdx]||TC[2];
+  const isH=hovered===n,isS=selected===n,isExp=expandedGroup===n;
+  // Glow
+  const gr=r*(isH?3.5:isS||isExp?3.8:2.8);
+  const gg=ctx.createRadialGradient(cx,cy,r*.2,cx,cy,gr);
+  gg.addColorStop(0,hexA2(c.g,isH?.28:isS||isExp?.32:.16));gg.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.beginPath();ctx.arc(cx,cy,gr,0,Math.PI*2);ctx.fillStyle=gg;ctx.fill();
+  // Pulse ring on hover
+  if(isH){hexPath(ctx,cx,cy,r+14+Math.sin(anim*.08)*5);ctx.strokeStyle=hexA2(c.r,.22);ctx.lineWidth=1;ctx.stroke();}
+  // Fill
+  hexPath(ctx,cx,cy,r);
+  const fg=ctx.createLinearGradient(cx-r,cy-r,cx+r,cy+r);
+  fg.addColorStop(0,isH?c.f+'ee':c.f);fg.addColorStop(1,'#0a0e1a');
+  ctx.fillStyle=fg;ctx.fill();
+  ctx.strokeStyle=isH||isS||isExp?c.r:hexA2(c.r,.6);ctx.lineWidth=isH||isS||isExp?2.5:2;ctx.stroke();
+  if(isS||isExp){hexPath(ctx,cx,cy,r-5);ctx.strokeStyle=hexA2(c.r,.3);ctx.lineWidth=1;ctx.stroke();}
+  hexPath(ctx,cx,cy,r*.86);ctx.strokeStyle=hexA2(c.r,.18);ctx.lineWidth=1;ctx.stroke();
+  // Label
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.font='bold 14px Segoe UI';
+  ctx.shadowColor=c.g;ctx.shadowBlur=isH?12:6;
+  ctx.fillStyle='#fff';ctx.fillText(n.label,cx,cy-10);ctx.shadowBlur=0;
+  ctx.font='10px Segoe UI';ctx.fillStyle=hexA2(c.t,.8);ctx.fillText(n.count+' pitcher'+(n.count!==1?'s':''),cx,cy+8);
+  ctx.font='9px Segoe UI';ctx.fillStyle=hexA2(c.t,.5);ctx.fillText('avg '+n.avgScore,cx,cy+22);
+  ctx.restore();
+}
+
+function drawGroupLines(){
+  const cn=nodes.find(n=>n.isC);if(!cn)return;
+  // Lines from center to group nodes
+  groupNodes.forEach(gn=>{
+    const c=TC[gn.tierIdx]||TC[2];
+    const isExp=expandedGroup===gn;
+    ctx.beginPath();ctx.moveTo(cn.cx,cn.cy);ctx.lineTo(gn.cx,gn.cy);
+    if(!isExp)ctx.setLineDash([4,8]);
+    ctx.strokeStyle=hexA2(c.g,isExp?.18:.08);ctx.lineWidth=isExp?1.5:.8;ctx.stroke();ctx.setLineDash([]);
+  });
+  // Lines from expanded group to its pitchers
+  if(expandedGroup){
+    const c=TC[expandedGroup.tierIdx]||TC[2];
+    expandedNodes.forEach(en=>{
+      const pc=TC[ti(en.p.metrics.score)];
+      const isH2=hovered===en,isS2=selected===en;
+      ctx.beginPath();ctx.moveTo(expandedGroup.cx,expandedGroup.cy);ctx.lineTo(en.cx,en.cy);
+      if(!(isH2||isS2))ctx.setLineDash([4,8]);
+      ctx.strokeStyle=hexA2(pc.g,isH2||isS2?.22:.08);ctx.lineWidth=isH2||isS2?1.5:.7;ctx.stroke();ctx.setLineDash([]);
+    });
+  }
+}
+
 function draw(){
   anim++;
   ctx.clearRect(0,0,W,H);
@@ -465,10 +525,19 @@ function draw(){
   ctx.translate(W/2,H/2);
   ctx.scale(zScale,zScale);
   ctx.translate(-W/2+zPanX,-H/2+zPanY);
-  drawStars();drawLines();
-  nodes.filter(n=>n.isSat).forEach(drawNode);
-  nodes.filter(n=>n.p&&!n.isSat).forEach(drawNode);
-  nodes.filter(n=>n.isC).forEach(drawNode);
+  drawStars();
+  if(groupMode){
+    drawGroupLines();
+    expandedSats.forEach(drawNode);
+    expandedNodes.forEach(drawNode);
+    groupNodes.forEach(drawGroupNode);
+    nodes.filter(n=>n.isC).forEach(drawNode);
+  } else {
+    drawLines();
+    nodes.filter(n=>n.isSat).forEach(drawNode);
+    nodes.filter(n=>n.p&&!n.isSat).forEach(drawNode);
+    nodes.filter(n=>n.isC).forEach(drawNode);
+  }
   ctx.restore();
   // Draw zoom indicator HUD (outside transform)
   if(zScale!==1){
@@ -504,13 +573,121 @@ function applyFilters(){
   const disp=none?PS:PS.filter(p=>active.has(p.id));
   if(disp.length>0)updateKpi(disp);
 }
+// ════ GROUP MODE ════
+function enterGroupMode(type){
+  groupMode=type;
+  expandedGroup=null;
+  expandedNodes=[];
+  expandedSats=[];
+  groupNodes=[];
+  closeP();selected=null;hovered=null;
+  zScale=1;zPanX=0;zPanY=0;updateZoomBtns();
+
+  const cx=W/2,cy=H/2;
+  let groups;
+  if(type==='hand'){
+    groups=[{val:'R',label:'RHP'},{val:'L',label:'LHP'}];
+  } else {
+    groups=[{val:'0',label:'Elite'},{val:'1',label:'Above Avg'},{val:'2',label:'Average'},{val:'3',label:'Below Avg'}];
+  }
+
+  // Collect pitchers per group
+  const populated=groups.map(g=>{
+    const pitchers=PS.filter(p=>{
+      if(type==='hand') return p.hand[0]===g.val;
+      return String(ti(p.metrics.score))===g.val;
+    });
+    return {...g, pitchers};
+  }).filter(g=>g.pitchers.length>0);
+
+  // Position groups in circle around center
+  const rad=200;
+  populated.forEach((g,i)=>{
+    const a=(Math.PI*2/populated.length)*i-Math.PI/2;
+    const avgScore=Math.round(g.pitchers.reduce((a2,p)=>a2+p.metrics.score,0)/g.pitchers.length);
+    const tierIdx=type==='tier'?parseInt(g.val):ti(avgScore);
+    groupNodes.push({
+      cx:cx+rad*Math.cos(a),
+      cy:cy+rad*Math.sin(a),
+      r:70,
+      isGroup:true,
+      groupType:type,
+      groupVal:g.val,
+      label:g.label,
+      pitchers:g.pitchers,
+      count:g.pitchers.length,
+      avgScore,
+      tierIdx,
+    });
+  });
+}
+
+function expandGroup(gNode){
+  if(expandedGroup===gNode){
+    // Collapse
+    expandedGroup=null;
+    expandedNodes=[];
+    expandedSats=[];
+    return;
+  }
+  expandedGroup=gNode;
+  expandedNodes=[];
+  expandedSats=[];
+  const ps=gNode.pitchers;
+  // Position pitchers in rings around the group node
+  const ring1=Math.min(ps.length,6);
+  const ring2=ps.length-ring1;
+  const r1=160,r2=260;
+  ps.forEach((p,i)=>{
+    let rad2,count2,idx;
+    if(i<ring1){rad2=r1;count2=ring1;idx=i;}
+    else{rad2=r2;count2=ring2;idx=i-ring1;}
+    const a=(Math.PI*2/count2)*idx-Math.PI/2;
+    const n={cx:gNode.cx+rad2*Math.cos(a),cy:gNode.cy+rad2*Math.sin(a),r:ss(p.metrics.score),p};
+    expandedNodes.push(n);
+    // Add satellites
+    const t=ti(p.metrics.score);
+    for(let s=0;s<2;s++){
+      const sd=n.r*1.9+rand(0,22),sa=rand(0,Math.PI*2);
+      expandedSats.push({cx:n.cx+sd*Math.cos(sa),cy:n.cy+sd*Math.sin(sa),r:n.r*0.32+rand(0,6),p:null,isSat:true,t,op:.2+rand(0,.2)});
+    }
+  });
+}
+
+function exitGroupMode(){
+  groupMode=null;
+  expandedGroup=null;
+  groupNodes=[];
+  expandedNodes=[];
+  expandedSats=[];
+  document.querySelectorAll('.fg.on').forEach(b=>b.classList.remove('on'));
+  filters.hand.clear();filters.role.clear();filters.tier.clear();
+  buildLayout();
+}
+
+// Filter buttons — Hand/Tier enter group mode, Role stays as dim/highlight filter
 document.querySelectorAll('.fg').forEach(btn=>{
   btn.addEventListener('click',()=>{
     const{group,val}=btn.dataset;
-    const s=filters[group];
-    if(s.has(val)){s.delete(val);btn.classList.remove('on');}
-    else{s.add(val);btn.classList.add('on');}
-    applyFilters();
+    if(group==='hand'||group==='tier'){
+      // Toggle group mode
+      if(groupMode===group){
+        exitGroupMode();
+      } else {
+        // Clear all button states first
+        document.querySelectorAll('.fg.on').forEach(b=>b.classList.remove('on'));
+        filters.hand.clear();filters.role.clear();filters.tier.clear();
+        btn.classList.add('on');
+        enterGroupMode(group);
+      }
+    } else {
+      // Role: keep existing dim/highlight behavior
+      if(groupMode) exitGroupMode();
+      const s=filters[group];
+      if(s.has(val)){s.delete(val);btn.classList.remove('on');}
+      else{s.add(val);btn.classList.add('on');}
+      applyFilters();
+    }
   });
 });
 
@@ -550,15 +727,45 @@ canvas.addEventListener('mousemove',e=>{
   // Transform screen coords → world coords for hit detection
   const{x:mx,y:my}=screenToWorld(sx,sy);
   let found=null;
-  for(let i=nodes.length-1;i>=0;i--){
-    const n=nodes[i];
-    if(n.isSat) continue;
-    if(n.isC||n.p){ if(hexHit(n,mx,my)){found=n;break;} }
+  if(groupMode){
+    // Check expanded pitcher nodes first (on top)
+    for(let i=expandedNodes.length-1;i>=0;i--){
+      if(hexHit(expandedNodes[i],mx,my)){found=expandedNodes[i];break;}
+    }
+    // Check group nodes
+    if(!found){
+      for(let i=groupNodes.length-1;i>=0;i--){
+        if(hexHit(groupNodes[i],mx,my)){found=groupNodes[i];break;}
+      }
+    }
+    // Check center node
+    if(!found){
+      const cn=nodes.find(n=>n.isC);
+      if(cn&&hexHit(cn,mx,my))found=cn;
+    }
+  } else {
+    for(let i=nodes.length-1;i>=0;i--){
+      const n=nodes[i];
+      if(n.isSat) continue;
+      if(n.isC||n.p){ if(hexHit(n,mx,my)){found=n;break;} }
+    }
   }
   hovered=found;canvas.style.cursor=found?'pointer':(zScale>1?'grab':'default');
   if(found){
     const tt=document.getElementById('tt');
-    if(found.isC){
+    if(found.isGroup){
+      // Group node tooltip
+      const c=TC[found.tierIdx]||TC[2];
+      const avgFn=fn=>found.pitchers.reduce((a2,p)=>a2+fn(p),0)/found.pitchers.length;
+      document.getElementById('ttN').textContent=found.label;
+      document.getElementById('ttN').style.color=c.r;
+      document.getElementById('ttM').textContent=`${found.count} pitcher${found.count!==1?'s':''} · Avg Score ${found.avgScore}`;
+      document.getElementById('ttSc').textContent=found.avgScore+'/100 avg';
+      document.getElementById('ttSc').style.color=c.r;
+      document.getElementById('ttSt').textContent=Math.round(avgFn(p=>p.metrics.stuffPlus));
+      document.getElementById('ttCw').textContent=avgFn(p=>p.metrics.cswPct).toFixed(1)+'%';
+      document.getElementById('ttWh').textContent=avgFn(p=>p.metrics.whiffPct).toFixed(1)+'%';
+    } else if(found.isC){
       const avg=v=>PS.reduce((a,p)=>a+v(p),0)/PS.length;
       document.getElementById('ttN').textContent='⚾ Team Overview';
       document.getElementById('ttN').style.color='#f5a030';
@@ -595,7 +802,14 @@ canvas.addEventListener('mousedown',e=>{
 canvas.addEventListener('mouseup',()=>{zDragging=false;zDragStart=null;});
 canvas.addEventListener('click',e=>{
   if(zDragging)return;
-  if(hovered){selected=hovered;if(hovered.isC)openTeamPanel();else openPanel(hovered.p);}
+  if(!hovered)return;
+  if(hovered.isGroup){
+    expandGroup(hovered);
+  } else if(hovered.isC){
+    selected=hovered;openTeamPanel();
+  } else if(hovered.p){
+    selected=hovered;openPanel(hovered.p);
+  }
 });
 canvas.addEventListener('mouseleave',()=>{hovered=null;zDragging=false;zDragStart=null;document.getElementById('tt').classList.remove('sh');});
 // Mouse wheel zoom
@@ -609,7 +823,7 @@ canvas.addEventListener('wheel',e=>{
   }
 },{passive:false});
 document.getElementById('rpClose').addEventListener('click',closeP);
-document.getElementById('resetBtn').addEventListener('click',()=>{selected=null;closeP();zScale=1;zPanX=0;zPanY=0;updateZoomBtns();});
+document.getElementById('resetBtn').addEventListener('click',()=>{selected=null;closeP();zScale=1;zPanX=0;zPanY=0;updateZoomBtns();if(groupMode)exitGroupMode();});
 
 function openPanel(p){
   ['rp','kpi','cw','fb'].forEach(id=>document.getElementById(id).classList.add(id==='rp'?'open':'po'));
@@ -1348,6 +1562,8 @@ function toggleUpdateBtn(){
 const _importCache={};  // client-side cache for freshly-imported teams
 
 async function loadTeamData(slug){
+  // Exit group mode if active
+  if(groupMode){groupMode=null;expandedGroup=null;groupNodes=[];expandedNodes=[];expandedSats=[];}
   // Check client cache first (for newly imported teams on Vercel)
   if(_importCache[slug]){
     PS=_importCache[slug];
