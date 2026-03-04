@@ -1505,14 +1505,29 @@ document.getElementById('scoutBtn').addEventListener('click',()=>{
 });
 
 let _crewDataLoaded=false;
-async function loadCrewSession(){
+let _crewDataCache=null;
+async function checkCrewSession(){
+  // Lightweight check: fetch crew data and cache it, set _crewDataLoaded flag
   try{
     const res=await fetch('/api/crew-session');
-    if(!res.ok)throw new Error(`HTTP ${res.status}`);
-    PS=await res.json();
+    if(!res.ok)return;
+    _crewDataCache=await res.json();
+    _crewDataLoaded=Array.isArray(_crewDataCache)&&_crewDataCache.some(p=>p.game_by_game&&p.game_by_game.length>0);
+    if(_crewDataLoaded) markScoutAgentsDone();
+  }catch(e){}
+}
+async function loadCrewSession(){
+  try{
+    if(_crewDataCache){
+      PS=_crewDataCache;
+    }else{
+      const res=await fetch('/api/crew-session');
+      if(!res.ok)throw new Error(`HTTP ${res.status}`);
+      PS=await res.json();
+      _crewDataCache=PS;
+    }
     closeP();updateKpi();resize();
     showScoutBadge();
-    // Check if pipeline enrichment data exists (game_by_game)
     _crewDataLoaded=Array.isArray(PS)&&PS.some(p=>p.game_by_game&&p.game_by_game.length>0);
     if(_crewDataLoaded) markScoutAgentsDone();
   }catch(err){
@@ -2119,6 +2134,8 @@ async function init(){
     currentTeam='sample';
     await loadTeamData('sample');
     loadSessions();
+    // Check if scout pipeline data exists (don't switch view, just set flags)
+    checkCrewSession();
   }catch(err){
     console.error('Failed to load pitchers:',err);
   }
