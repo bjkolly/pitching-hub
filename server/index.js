@@ -221,7 +221,8 @@ function requireAuth(req, res, next) {
 }
 
 function requireAdmin(req, res, next) {
-  if (!req.user?.isAdmin) {
+  // Fallback: treat env-var admin user as admin even with old JWT tokens
+  if (!req.user?.isAdmin && req.user?.user !== ADMIN_USER) {
     return res.status(403).json({ error: 'Admin access required' });
   }
   next();
@@ -302,7 +303,9 @@ app.use('/api', requireAuth);
 
 // Current user info
 app.get('/api/me', (req, res) => {
-  res.json({ user: req.user.user, isAdmin: !!req.user.isAdmin });
+  // Fallback: treat env-var admin user as admin even if JWT lacks isAdmin claim (old token)
+  const isAdmin = !!req.user.isAdmin || req.user.user === ADMIN_USER;
+  res.json({ user: req.user.user, isAdmin });
 });
 
 // ── Admin: User Management ──────────────────────────────────────────────────
