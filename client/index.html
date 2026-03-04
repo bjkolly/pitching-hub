@@ -1697,17 +1697,22 @@ const _teamMeta={};  // {slug: {name, ncaa_id}} for update button
 
 async function loadTeams(){
   try{
-    const res=await fetch('/api/teams');
-    if(!res.ok)return;
-    const teams=await res.json();
+    let teams=[];
+    try{
+      const res=await fetch('/api/teams');
+      if(res.ok) teams=await res.json();
+    }catch(e){ console.warn('[loadTeams] API failed, using localStorage only:',e); }
     // Merge localStorage imported teams that the server doesn't know about
     const lsTeams=getImportedTeamsFromLS();
     const serverSlugs=new Set(teams.map(t=>t.slug));
+    let merged_count=0;
     for(const lt of lsTeams){
       if(!serverSlugs.has(lt.slug)){
         teams.push(lt);
+        merged_count++;
       }
     }
+    if(merged_count) console.log('[loadTeams] merged',merged_count,'team(s) from localStorage');
     // Sort all teams except "Sample Data" (which stays first from the server)
     const sample=teams.find(t=>t.slug==='sample');
     const rest=teams.filter(t=>t.slug!=='sample').sort((a,b)=>a.name.localeCompare(b.name));
@@ -1735,21 +1740,33 @@ function _lsKey(slug){ return 'ph_team_'+slug; }
 function _lsMetaKey(){ return 'ph_imported_meta'; }
 
 function saveImportedTeamToLS(slug, name, ncaa_id, pitchers){
+  // Save metadata first (small) — even if pitcher data exceeds quota,
+  // the team will still appear in the dropdown on reload.
   try{
-    localStorage.setItem(_lsKey(slug), JSON.stringify(pitchers));
-    // Also save metadata list so loadTeams can merge
     const meta = JSON.parse(localStorage.getItem(_lsMetaKey())||'[]');
     if(!meta.find(m=>m.slug===slug)){
       meta.push({name,slug,ncaa_id});
       meta.sort((a,b)=>a.name.localeCompare(b.name));
     }
     localStorage.setItem(_lsMetaKey(), JSON.stringify(meta));
-  }catch(e){console.warn('localStorage save failed:',e);}
+    console.log('[LS] saved meta for',slug,'— total imported:',meta.length);
+  }catch(e){console.warn('[LS] meta save failed:',e);}
+  // Save full pitcher data (may be large)
+  try{
+    const json=JSON.stringify(pitchers);
+    localStorage.setItem(_lsKey(slug), json);
+    console.log('[LS] saved pitcher data for',slug,'—',Math.round(json.length/1024)+'KB');
+  }catch(e){
+    console.warn('[LS] pitcher data save failed (quota?):',e);
+  }
 }
 
 function getImportedTeamsFromLS(){
-  try{ return JSON.parse(localStorage.getItem(_lsMetaKey())||'[]'); }
-  catch{ return []; }
+  try{
+    const teams=JSON.parse(localStorage.getItem(_lsMetaKey())||'[]');
+    if(teams.length) console.log('[LS] found',teams.length,'imported team(s):',teams.map(t=>t.slug).join(', '));
+    return teams;
+  }catch{ return []; }
 }
 
 function getTeamDataFromLS(slug){
@@ -1777,8 +1794,10 @@ async function loadTeamData(slug){
     const res=await fetch(url);
     if(!res.ok){
       // If server returns 404, try localStorage
+      console.log('[loadTeamData]',slug,'server returned',res.status,'— checking localStorage');
       const lsData=getTeamDataFromLS(slug);
       if(lsData){
+        console.log('[loadTeamData]',slug,'loaded from localStorage:',lsData.length,'pitchers');
         PS=lsData;
         _importCache[slug]=lsData; // warm cache
         filters.hand.clear();filters.role.clear();filters.tier.clear();
