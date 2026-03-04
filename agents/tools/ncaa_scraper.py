@@ -192,7 +192,7 @@ def _table_to_dicts(table, header_row_idx: int = 0) -> list[dict]:
 
 
 def _get_wm_schedule_impl() -> list[dict]:
-    """Scrape W&M's 2025 schedule from Warren Nolan.
+    """Scrape W&M's schedule from Tribe Athletics (primary) or Warren Nolan.
 
     Returns a list of game dicts with date, opponent, opponent_slug,
     home_away, result, score, box_score_id, and conference_game.
@@ -204,77 +204,91 @@ def _get_wm_schedule_impl() -> list[dict]:
 
     games: list[dict] = []
 
+    # --- Strategy A (PRIMARY): Tribe Athletics print-friendly page ---
+    # The ?print=true version returns full server-rendered HTML with
+    # box score links.  Each game is a <tr class="sidearm-schedule-game">
+    # with 10 cells:
+    #   Cell 0 = date ("February 14, 2025 (Friday)")
+    #   Cell 2 = "Home" / "Away" / "Neutral"
+    #   Cell 3 = opponent name (** suffix = conference)
+    #   Cell 7 = tournament name (if any)
+    #   Cell 8 = result ("W,5-4" or "L,9-10F/7" or "PPD")
+    #   Cell 9 = links (Box Score href contains /boxscore/{id})
     try:
-        soup = _fetch(WARREN_NOLAN_URL)
-    except Exception as e:
-        print(f"[schedule] Warren Nolan fetch failed: {e}")
-        _write_cache(cache_file, games)
-        return games
+        tribe_url = TRIBE_SCHEDULE_URL + "?print=true"
+        soup = _fetch(tribe_url)
+        game_rows = soup.find_all("tr", class_=re.compile(r"sidearm-schedule-game"))
+        print(f"[schedule] Tribe Athletics: found {len(game_rows)} game rows")
 
-    # Warren Nolan renders schedule in table rows.  Each game row
-    # contains cells for: date, opponent, location, result/score,
-    # and sometimes a conference indicator.
-    # Strategy: find all table rows and parse cells that look like games.
-    all_tables = soup.find_all("table")
-
-    # Also try the full page text line-by-line for a robust fallback.
-    # Warren Nolan uses JS-heavy rendering, so we parse whatever the
-    # server sends.  The text version is very reliable.
-    page_text = soup.get_text("\n")
-    lines = [l.strip() for l in page_text.split("\n") if l.strip()]
-
-    # --- Strategy A: parse HTML tables ---
-    for table in all_tables:
-        for tr in table.find_all("tr"):
-            cells = tr.find_all(["td", "th"])
-            texts = [c.get_text(strip=True) for c in cells]
-            if len(texts) < 3:
-                continue
-            # Look for a date pattern like "Feb 14" or "Mar 1"
-            date_match = re.match(
-                r"(Jan|Feb|Mar|Apr|May|Jun)\s+\d{1,2}", texts[0]
-            )
-            if not date_match:
+        for tr in game_rows:
+            cells = tr.find_all("td")
+            if len(cells) < 9:
                 continue
 
-            date_str = texts[0]
-            opponent_raw = texts[1] if len(texts) > 1 else ""
-            location_raw = texts[2] if len(texts) > 2 else ""
-            result_raw = texts[3] if len(texts) > 3 else ""
+            # --- Date ---
+            raw_date = cells[0].get_text(strip=True)
+            # "February 14, 2025 (Friday)" → "Feb 14"
+            from datetime import datetime as _dt
+            try:
+                dt_obj = _dt.strptime(
+                    re.sub(r"\s*\(.*?\)", "", raw_date).strip(),
+                    "%B %d, %Y"
+                )
+                date_str = dt_obj.strftime("%b %-d")
+            except Exception:
+                # Fallback: grab "Month Day" from text
+                m = re.match(r"(\w+)\s+(\d{1,2})", raw_date)
+                date_str = f"{m.group(1)[:3]} {m.group(2)}" if m else raw_date[:10]
 
-            # Determine home/away
-            home_away = "home"
-            if "away" in location_raw.lower() or location_raw.lower().startswith("at"):
+            # --- Home / Away ---
+            ha_text = cells[2].get_text(strip=True).lower() if len(cells) > 2 else ""
+            if "away" in ha_text:
                 home_away = "away"
-            elif "neutral" in location_raw.lower():
+            elif "neutral" in ha_text:
                 home_away = "neutral"
+            else:
+                home_away = "home"
 
-            # Parse result
+            # --- Opponent ---
+            opp_raw = cells[3].get_text(strip=True)
+            # Conference games end with ** on Sidearm sites
+            conference_game = opp_raw.endswith("**")
+            opp_name = opp_raw.rstrip("*").strip()
+
+            # --- Result / Score ---
+            result_raw = cells[8].get_text(strip=True) if len(cells) > 8 else ""
             result = None
             score = ""
-            w_l_match = re.match(r"([WL])\s+(\d+-\d+)", result_raw)
-            if w_l_match:
-                result = w_l_match.group(1)
-                score = w_l_match.group(2)
-            elif "postponed" in result_raw.lower() or "ppd" in result_raw.lower():
+            if result_raw.upper().startswith("PPD") or "postponed" in result_raw.lower():
                 result = "PPD"
+            else:
+                wl_match = re.match(r"([WL]),\s*(\d+-\d+)", result_raw)
+                if wl_match:
+                    result = wl_match.group(1)
+                    score = wl_match.group(2)
 
-            # Conference game
-            conf = any(
-                opp["name"].lower() in opponent_raw.lower()
-                for opp in CAA_OPPONENTS
-            )
-
-            opp_name = re.sub(r"\s*\(.*?\)", "", opponent_raw).strip()
-            slug = _find_slug(opp_name)
-
-            # Extract box score id from any link in the row
+            # --- Box score ID (from link in Cell 9 or anywhere in row) ---
             box_score_id = None
-            for a in tr.find_all("a", href=True):
-                bs_match = re.search(r"boxscore[/=](\d+)", a["href"])
+            opp_slug_from_link = None
+            search_area = cells[9] if len(cells) > 9 else tr
+            for a in search_area.find_all("a", href=True):
+                bs_match = re.search(
+                    r"/stats/\d{4}/([^/]+)/boxscore/(\d+)", a["href"]
+                )
                 if bs_match:
-                    box_score_id = bs_match.group(1)
+                    opp_slug_from_link = bs_match.group(1)
+                    box_score_id = bs_match.group(2)
                     break
+
+            # Determine slug: prefer the one from the box score URL
+            slug = opp_slug_from_link or _find_slug(opp_name)
+
+            # If conference wasn't detected by **, also check config
+            if not conference_game:
+                conference_game = any(
+                    o["name"].lower() in opp_name.lower()
+                    for o in CAA_OPPONENTS
+                )
 
             games.append({
                 "date": date_str,
@@ -284,100 +298,99 @@ def _get_wm_schedule_impl() -> list[dict]:
                 "result": result,
                 "score": score,
                 "box_score_id": box_score_id,
-                "conference_game": conf,
+                "conference_game": conference_game,
             })
 
-    # --- Strategy B: if no table rows found, parse structured text ---
+    except Exception as e:
+        print(f"[schedule] Tribe Athletics fetch failed: {e}")
+
+    # --- Strategy B (FALLBACK): Warren Nolan ---
     if not games:
-        # The Warren Nolan data we fetched via WebFetch showed a clear
-        # text pattern.  Parse it line-by-line.
-        i = 0
-        while i < len(lines):
-            date_match = re.match(
-                r"((?:Jan|Feb|Mar|Apr|May|Jun)\s+\d{1,2})", lines[i]
-            )
-            if not date_match:
-                i += 1
-                continue
+        print("[schedule] Falling back to Warren Nolan…")
+        try:
+            soup = _fetch(WARREN_NOLAN_URL)
+            for tr in soup.find_all("tr"):
+                cells = tr.find_all(["td", "th"])
+                texts = [c.get_text(strip=True) for c in cells]
+                if len(texts) < 3:
+                    continue
+                date_match = re.match(
+                    r"(Jan|Feb|Mar|Apr|May|Jun)\s+\d{1,2}", texts[0]
+                )
+                if not date_match:
+                    continue
 
-            date_str = date_match.group(1)
-            # Scan ahead for opponent, location, result
-            opp_name = lines[i + 1] if i + 1 < len(lines) else ""
-            location_raw = lines[i + 2] if i + 2 < len(lines) else ""
-            result_raw = lines[i + 3] if i + 3 < len(lines) else ""
+                date_str = texts[0]
+                opponent_raw = texts[1] if len(texts) > 1 else ""
+                location_raw = texts[2] if len(texts) > 2 else ""
+                result_raw = texts[3] if len(texts) > 3 else ""
 
-            # Clean opponent name
-            opp_name = re.sub(r"\s*\(.*?\)", "", opp_name).strip()
-            opp_name = re.sub(r"\s*RPI:.*", "", opp_name).strip()
+                home_away = "home"
+                if "away" in location_raw.lower() or location_raw.lower().startswith("at"):
+                    home_away = "away"
+                elif "neutral" in location_raw.lower():
+                    home_away = "neutral"
 
-            # Home/away
-            home_away = "home"
-            if "away" in location_raw.lower():
-                home_away = "away"
-            elif "neutral" in location_raw.lower():
-                home_away = "neutral"
+                result = None
+                score = ""
+                w_l_match = re.match(r"([WL])\s+(\d+-\d+)", result_raw)
+                if w_l_match:
+                    result = w_l_match.group(1)
+                    score = w_l_match.group(2)
+                elif "ppd" in result_raw.lower() or "postponed" in result_raw.lower():
+                    result = "PPD"
 
-            # Result
-            result = None
-            score = ""
-            wl = re.match(r"([WL])\s+(\d+-\d+)", result_raw)
-            if wl:
-                result = wl.group(1)
-                score = wl.group(2)
-            elif "postponed" in result_raw.lower():
-                result = "PPD"
+                opp_name = re.sub(r"\s*\(.*?\)", "", opponent_raw).strip()
+                slug = _find_slug(opp_name)
+                conf = any(
+                    opp["name"].lower() in opp_name.lower()
+                    for opp in CAA_OPPONENTS
+                )
 
-            conf = any(
-                o["name"].lower() in opp_name.lower() for o in CAA_OPPONENTS
-            )
-            slug = _find_slug(opp_name)
+                box_score_id = None
+                for a in tr.find_all("a", href=True):
+                    bs_match = re.search(r"boxscore[/=](\d+)", a["href"])
+                    if bs_match:
+                        box_score_id = bs_match.group(1)
+                        break
 
-            games.append({
-                "date": date_str,
-                "opponent": opp_name,
-                "opponent_slug": slug,
-                "home_away": home_away,
-                "result": result,
-                "score": score,
-                "box_score_id": None,
-                "conference_game": conf,
-            })
-            i += 4  # skip past this game block
+                games.append({
+                    "date": date_str,
+                    "opponent": opp_name,
+                    "opponent_slug": slug,
+                    "home_away": home_away,
+                    "result": result,
+                    "score": score,
+                    "box_score_id": box_score_id,
+                    "conference_game": conf,
+                })
+        except Exception as e:
+            print(f"[schedule] Warren Nolan fallback also failed: {e}")
 
-    # --- Strategy C: if still empty, use Tribe Athletics JSON-LD ---
+    # --- Strategy C: Tribe Athletics JSON-LD (no box scores, last resort) ---
     if not games:
         try:
             soup2 = _fetch(TRIBE_SCHEDULE_URL)
-            import json as _json
             for script in soup2.find_all("script", {"type": "application/ld+json"}):
                 try:
-                    ld = _json.loads(script.string)
-                    if isinstance(ld, list):
-                        items = ld
-                    elif isinstance(ld, dict):
-                        items = [ld]
-                    else:
-                        continue
+                    ld = json.loads(script.string)
+                    items = ld if isinstance(ld, list) else [ld]
                     for item in items:
                         if item.get("@type") != "SportsEvent":
                             continue
                         name = item.get("name", "")
                         start = item.get("startDate", "")
-
-                        # Parse date
-                        from datetime import datetime
+                        from datetime import datetime as _dt2
                         try:
-                            dt = datetime.fromisoformat(start)
-                            date_str = dt.strftime("%b %d").replace(" 0", " ")
+                            dt = _dt2.fromisoformat(start)
+                            date_str = dt.strftime("%b %-d")
                         except Exception:
                             date_str = start[:10]
 
-                        # Parse opponent from "William & Mary At/Vs Opponent"
                         opp_match = re.search(
                             r"William\s*&\s*Mary\s+(?:At|Vs)\s+(.+)", name, re.I
                         )
                         opp_name = opp_match.group(1).strip() if opp_match else name
-
                         at_game = " At " in name
                         home_away = "away" if at_game else "home"
                         slug = _find_slug(opp_name)
@@ -385,7 +398,6 @@ def _get_wm_schedule_impl() -> list[dict]:
                             o["name"].lower() in opp_name.lower()
                             for o in CAA_OPPONENTS
                         )
-
                         games.append({
                             "date": date_str,
                             "opponent": opp_name,
@@ -399,8 +411,10 @@ def _get_wm_schedule_impl() -> list[dict]:
                 except Exception:
                     continue
         except Exception as e:
-            print(f"[schedule] Tribe Athletics JSON-LD fallback failed: {e}")
+            print(f"[schedule] JSON-LD fallback also failed: {e}")
 
+    print(f"[schedule] Total games: {len(games)}, "
+          f"with box scores: {sum(1 for g in games if g.get('box_score_id'))}")
     _write_cache(cache_file, games)
     return games
 
@@ -952,7 +966,7 @@ def _get_upcoming_schedule_2026_impl() -> list[dict]:
 
 @tool("get_wm_schedule")
 def get_wm_schedule() -> list[dict]:
-    """Scrape W&M's 2025 schedule from Warren Nolan.
+    """Scrape W&M's schedule from Tribe Athletics (primary) or Warren Nolan.
     Returns a list of game dicts with date, opponent, opponent_slug,
     home_away, result, score, box_score_id, and conference_game.
     """

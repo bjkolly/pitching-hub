@@ -1659,11 +1659,23 @@ async function loadTeams(){
     const res=await fetch('/api/teams');
     if(!res.ok)return;
     const teams=await res.json();
+    // Merge localStorage imported teams that the server doesn't know about
+    const lsTeams=getImportedTeamsFromLS();
+    const serverSlugs=new Set(teams.map(t=>t.slug));
+    for(const lt of lsTeams){
+      if(!serverSlugs.has(lt.slug)){
+        teams.push(lt);
+      }
+    }
+    // Sort all teams except "Sample Data" (which stays first from the server)
+    const sample=teams.find(t=>t.slug==='sample');
+    const rest=teams.filter(t=>t.slug!=='sample').sort((a,b)=>a.name.localeCompare(b.name));
+    const merged=sample?[sample,...rest]:rest;
     const sel=document.getElementById('teamSel');
     sel.innerHTML=`<option value="">Select Team...</option>`+
-      teams.map(t=>`<option value="${t.slug}">${t.name}</option>`).join('');
+      merged.map(t=>`<option value="${t.slug}">${t.name}</option>`).join('');
     // Store metadata (ncaa_id) for each team
-    for(const t of teams){
+    for(const t of merged){
       _teamMeta[t.slug]={name:t.name,ncaa_id:t.ncaa_id||null};
     }
   }catch(err){console.error('Failed to load teams:',err);}
@@ -1676,6 +1688,35 @@ function toggleUpdateBtn(){
 }
 
 const _importCache={};  // client-side cache for freshly-imported teams
+
+// ── localStorage persistence for imported teams ──
+function _lsKey(slug){ return 'ph_team_'+slug; }
+function _lsMetaKey(){ return 'ph_imported_meta'; }
+
+function saveImportedTeamToLS(slug, name, ncaa_id, pitchers){
+  try{
+    localStorage.setItem(_lsKey(slug), JSON.stringify(pitchers));
+    // Also save metadata list so loadTeams can merge
+    const meta = JSON.parse(localStorage.getItem(_lsMetaKey())||'[]');
+    if(!meta.find(m=>m.slug===slug)){
+      meta.push({name,slug,ncaa_id});
+      meta.sort((a,b)=>a.name.localeCompare(b.name));
+    }
+    localStorage.setItem(_lsMetaKey(), JSON.stringify(meta));
+  }catch(e){console.warn('localStorage save failed:',e);}
+}
+
+function getImportedTeamsFromLS(){
+  try{ return JSON.parse(localStorage.getItem(_lsMetaKey())||'[]'); }
+  catch{ return []; }
+}
+
+function getTeamDataFromLS(slug){
+  try{
+    const raw=localStorage.getItem(_lsKey(slug));
+    return raw ? JSON.parse(raw) : null;
+  }catch{ return null; }
+}
 
 async function loadTeamData(slug){
   // Exit group mode if active
@@ -1691,9 +1732,34 @@ async function loadTeamData(slug){
   }
   const url=slug&&slug!=='sample'?`/api/pitchers?team=${encodeURIComponent(slug)}`
     :slug==='sample'?'/api/pitchers?team=sample':'/api/pitchers';
-  const res=await fetch(url);
-  if(!res.ok)throw new Error(`HTTP ${res.status}`);
-  PS=await res.json();
+  try{
+    const res=await fetch(url);
+    if(!res.ok){
+      // If server returns 404, try localStorage
+      const lsData=getTeamDataFromLS(slug);
+      if(lsData){
+        PS=lsData;
+        _importCache[slug]=lsData; // warm cache
+        filters.hand.clear();filters.role.clear();filters.tier.clear();
+        document.querySelectorAll('.fg.on').forEach(b=>b.classList.remove('on'));
+        closeP();
+        updateKpi();resize();draw();
+        return;
+      }
+      throw new Error(`HTTP ${res.status}`);
+    }
+    PS=await res.json();
+  }catch(err){
+    // Last resort: localStorage
+    const lsData=getTeamDataFromLS(slug);
+    if(lsData){
+      PS=lsData;
+      _importCache[slug]=lsData;
+    }else{
+      console.error('loadTeamData failed:',err);
+      return;
+    }
+  }
   filters.hand.clear();filters.role.clear();filters.tier.clear();
   document.querySelectorAll('.fg.on').forEach(b=>b.classList.remove('on'));
   closeP();
@@ -1839,6 +1905,8 @@ async function ipImport(ncaaId,name){
               // Cache pitcher data client-side (Vercel /tmp may not persist)
               if(parsed.pitchers&&Array.isArray(parsed.pitchers)){
                 _importCache[parsed.slug]=parsed.pitchers;
+                // Persist to localStorage so team survives page refreshes
+                saveImportedTeamToLS(parsed.slug,parsed.name,parsed.ncaa_id,parsed.pitchers);
               }
               // Add to dropdown without needing server persistence
               const sel=document.getElementById('teamSel');
@@ -1977,9 +2045,10 @@ async function updateTeam(){
               bar.style.width='100%';
               pct.textContent='100%';
               addLog(`✓ Updated ${parsed.pitcherCount} pitchers for ${parsed.name}`,'log-system');
-              // Cache fresh data + reload view
+              // Cache fresh data + persist to localStorage + reload view
               if(parsed.pitchers&&Array.isArray(parsed.pitchers)){
                 _importCache[parsed.slug]=parsed.pitchers;
+                saveImportedTeamToLS(parsed.slug,parsed.name,meta.ncaa_id,parsed.pitchers);
               }
               loadTeamData(parsed.slug);
               setTimeout(()=>closeUpdateOverlay(btn),2000);

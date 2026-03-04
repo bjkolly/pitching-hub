@@ -520,6 +520,7 @@ def build_crew(agents: dict[str, Agent], tasks: list[Task]) -> Crew:
         process=Process.sequential,
         verbose=True,
         cache=True,
+        max_rpm=5,  # Throttle API calls to stay under rate limits
         output_log_file=str(
             Path(__file__).resolve().parent / "crew_run.log"
         ),

@@ -546,10 +546,16 @@ app.post('/api/run-agents', (req, res) => {
   const mainPy    = path.join(AGENTS_DIR, 'main.py');
 
   if (!fs.existsSync(pythonBin)) {
-    return res.status(500).json({ error: 'Python venv not found. Run setup first.' });
+    return res.status(422).json({
+      error: 'Scout Agent Pipeline requires a local Python environment. '
+           + 'This feature is not available on Vercel — run locally with: node server/index.js',
+    });
   }
   if (!fs.existsSync(mainPy)) {
-    return res.status(500).json({ error: 'agents/main.py not found.' });
+    return res.status(422).json({
+      error: 'agents/main.py not found. '
+           + 'Ensure the agents/ directory is present in the project root.',
+    });
   }
 
   // SSE headers
