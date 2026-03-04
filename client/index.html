@@ -624,10 +624,11 @@ function enterGroupMode(type){
 
 function expandGroup(gNode){
   if(expandedGroup===gNode){
-    // Collapse
+    // Collapse — re-center on the group layout
     expandedGroup=null;
     expandedNodes=[];
     expandedSats=[];
+    zPanX=0;zPanY=0;zScale=1;updateZoomBtns();
     return;
   }
   expandedGroup=gNode;
@@ -652,6 +653,11 @@ function expandGroup(gNode){
       expandedSats.push({cx:n.cx+sd*Math.cos(sa),cy:n.cy+sd*Math.sin(sa),r:n.r*0.32+rand(0,6),p:null,isSat:true,t,op:.2+rand(0,.2)});
     }
   });
+  // Auto-center view on the expanded group node
+  zPanX=W/2-gNode.cx;
+  zPanY=H/2-gNode.cy;
+  zScale=1;
+  updateZoomBtns();
 }
 
 function exitGroupMode(){
@@ -662,6 +668,7 @@ function exitGroupMode(){
   expandedSats=[];
   document.querySelectorAll('.fg.on').forEach(b=>b.classList.remove('on'));
   filters.hand.clear();filters.role.clear();filters.tier.clear();
+  zPanX=0;zPanY=0;zScale=1;updateZoomBtns();
   buildLayout();
 }
 
@@ -750,7 +757,7 @@ canvas.addEventListener('mousemove',e=>{
       if(n.isC||n.p){ if(hexHit(n,mx,my)){found=n;break;} }
     }
   }
-  hovered=found;canvas.style.cursor=found?'pointer':(zScale>1?'grab':'default');
+  hovered=found;canvas.style.cursor=found?'pointer':'grab';
   if(found){
     const tt=document.getElementById('tt');
     if(found.isGroup){
@@ -792,16 +799,23 @@ canvas.addEventListener('mousemove',e=>{
   } else document.getElementById('tt').classList.remove('sh');
 });
 canvas.addEventListener('mousedown',e=>{
-  if(zScale>1&&!hovered){
+  if(!hovered){
     zDragging=true;
     zDragStart={x:e.clientX,y:e.clientY,panX:zPanX,panY:zPanY};
     canvas.style.cursor='grabbing';
     e.preventDefault();
   }
 });
-canvas.addEventListener('mouseup',()=>{zDragging=false;zDragStart=null;});
+let zDidDrag=false;
+canvas.addEventListener('mouseup',()=>{
+  if(zDragging&&zDragStart){
+    const dx=Math.abs(zPanX-zDragStart.panX),dy=Math.abs(zPanY-zDragStart.panY);
+    zDidDrag=(dx>3||dy>3);
+  }
+  zDragging=false;zDragStart=null;
+});
 canvas.addEventListener('click',e=>{
-  if(zDragging)return;
+  if(zDidDrag){zDidDrag=false;return;}
   if(!hovered)return;
   if(hovered.isGroup){
     expandGroup(hovered);
