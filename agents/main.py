@@ -600,17 +600,27 @@ def _pre_compute_scouting_data() -> dict:
         gs = p.get("gs", 0)
         ip_for_rate = ip if ip > 0 else 1
 
-        # Derived metrics
-        kPct = round(k / ip_for_rate * 9 / 9 * 100, 1) if ip > 0 else 0
-        bbPct = round(bb / ip_for_rate * 9 / 9 * 100, 1) if ip > 0 else 0
-        whiffPct = round(kPct * 1.25, 1)
-        cswPct = round(0.6 * whiffPct + 12, 1)
+        # Derived metrics — approximate BF to get true percentages
+        # BF ≈ IP*3 + H + BB  (standard approximation when TBF unavailable)
+        bf = ip * 3 + h + bb if ip > 0 else 1
+        bf = max(bf, 1)
+
+        kPct = round(k / bf * 100, 1)
+        bbPct = round(bb / bf * 100, 1)
+        k_per_9 = round(k / ip_for_rate * 9, 1)
+        bb_per_9 = round(bb / ip_for_rate * 9, 1)
+
+        # whiffPct and cswPct require pitch-level data we don't have;
+        # estimate from K% using league-average relationships
+        whiffPct = round(min(kPct * 1.1, 45.0), 1)   # cap at 45%
+        cswPct = round(min(whiffPct * 0.55 + 15, 40.0), 1)  # cap at 40%
+
         stuffPlus = round(max(70, min(160,
-            100 + (kPct - bbPct - 10) * 3 + (4.60 - era) * 5
+            100 + (k_per_9 - bb_per_9 - 2) * 4 + (4.50 - era) * 5
         )))
         score = round(
             stuffPlus * 0.35
-            + (100 - bbPct * 5) * 0.25
+            + (100 - bbPct * 2) * 0.25
             + kPct * 0.25
             + (100 - 33.0 * 2) * 0.15
         )
@@ -831,18 +841,34 @@ def main():
         if not isinstance(enrichments, list):
             enrichments = [enrichments]
 
-        # Merge enrichments into pitcher profiles
+        # Merge enrichments into pitcher profiles using last-name matching
+        matched_count = 0
         for enr in enrichments:
-            enr_name = enr.get("name", "").lower()
+            enr_name = enr.get("name", "").lower().strip()
+            if not enr_name:
+                continue
+            # Extract last name for fuzzy matching
+            enr_last = enr_name.split()[-1] if " " in enr_name else enr_name
+            best_match = None
+            # Prefer exact match, fall back to last-name match
             for pp in pitcher_profiles:
-                if pp["name"].lower() == enr_name or enr_name in pp["name"].lower():
-                    if "game_by_game" in enr:
-                        pp["game_by_game"] = enr["game_by_game"]
-                    if "season_summary" in enr:
-                        pp["season_summary"].update(enr["season_summary"])
+                pp_name = pp["name"].lower().strip()
+                if pp_name == enr_name:
+                    best_match = pp
                     break
+                pp_last = pp_name.split(",")[0].strip() if "," in pp_name else pp_name.split()[-1]
+                if pp_last == enr_last and best_match is None:
+                    best_match = pp
+            if best_match:
+                if "game_by_game" in enr:
+                    best_match["game_by_game"] = enr["game_by_game"]
+                if "season_summary" in enr:
+                    best_match["season_summary"].update(enr["season_summary"])
+                matched_count += 1
+            else:
+                print(f"  ⚠  No match for enrichment name: '{enr.get('name')}'")
 
-        print(f"\n✅ Merged enrichments for {len(enrichments)} pitchers")
+        print(f"\n✅ Merged enrichments for {matched_count}/{len(enrichments)} pitchers")
 
     except Exception as e:
         print(f"\n⚠  LLM enrichment failed ({e}); using base profiles")

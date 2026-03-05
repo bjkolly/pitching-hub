@@ -15,6 +15,7 @@ import json
 import re
 import sys
 import time
+from datetime import datetime as _dt
 from pathlib import Path
 from typing import Optional
 
@@ -228,7 +229,6 @@ def _get_wm_schedule_impl() -> list[dict]:
             # --- Date ---
             raw_date = cells[0].get_text(strip=True)
             # "February 14, 2025 (Friday)" → "Feb 14"
-            from datetime import datetime as _dt
             try:
                 dt_obj = _dt.strptime(
                     re.sub(r"\s*\(.*?\)", "", raw_date).strip(),
@@ -380,9 +380,8 @@ def _get_wm_schedule_impl() -> list[dict]:
                             continue
                         name = item.get("name", "")
                         start = item.get("startDate", "")
-                        from datetime import datetime as _dt2
                         try:
-                            dt = _dt2.fromisoformat(start)
+                            dt = _dt.fromisoformat(start)
                             date_str = dt.strftime("%b %-d")
                         except Exception:
                             date_str = start[:10]
@@ -909,9 +908,8 @@ def _get_upcoming_schedule_2026_impl() -> list[dict]:
                     name = item.get("name", "")
                     start = item.get("startDate", "")
 
-                    from datetime import datetime
                     try:
-                        dt = datetime.fromisoformat(start)
+                        dt = _dt.fromisoformat(start)
                         date_str = dt.strftime("%b %d").replace(" 0", " ")
                     except Exception:
                         date_str = start[:10] if start else ""
