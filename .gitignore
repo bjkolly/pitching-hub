@@ -1,8 +1,9 @@
 # Dependencies
 node_modules/
 
-# Environment secrets — NEVER commit this
+# Environment secrets — NEVER commit these
 .env
+.env.docker
 
 # Ephemeral session data
 data/session.json

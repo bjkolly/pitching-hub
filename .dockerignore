@@ -1,0 +1,38 @@
+# Dependencies (rebuilt inside Docker)
+node_modules/
+agents/venv/
+
+# Python bytecode
+__pycache__/
+agents/__pycache__/
+agents/tools/__pycache__/
+
+# Git & IDE
+.git/
+.gitignore
+.claude/
+.vercel/
+.DS_Store
+
+# Environment secrets (passed via docker-compose env_file)
+.env
+.env.docker
+agents/.env
+
+# Runtime / ephemeral data (volume-mounted at /app/data)
+data/cache/
+data/session.json
+data/crew_session.json
+data/*.csv
+
+# Agent logs
+agents/*.log*
+agents/crew_run.log*
+
+# Analytics (standalone, not used by server)
+analytics/
+
+# Docker files (no need to include themselves in context)
+Dockerfile
+docker-compose.yml
+README-DOCKER.md

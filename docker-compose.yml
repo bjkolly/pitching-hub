@@ -1,0 +1,28 @@
+version: "3.9"
+
+services:
+  pitching-hub:
+    build: .
+    container_name: pitching-hub
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3001}:3001"
+    env_file:
+      - .env.docker
+    volumes:
+      - pitching-data:/app/data
+    # CrewAI + LLM enrichment can be memory-hungry
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+volumes:
+  pitching-data:
+    driver: local
